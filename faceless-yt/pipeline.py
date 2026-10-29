@@ -34,6 +34,23 @@ def load_history():
     return [x if isinstance(x, dict) else {"title": x} for x in h]
 
 
+IDEAS = HERE / "ideas.json"
+
+
+def next_idea():
+    ideas = json.loads(IDEAS.read_text()) if IDEAS.exists() else []
+    open_ = [i for i in ideas if not i.get("used")]
+    return max(open_, key=lambda i: i.get("score", 0)) if open_ else None
+
+
+def mark_used(title):
+    ideas = json.loads(IDEAS.read_text())
+    for i in ideas:
+        if i["title"] == title:
+            i["used"] = True
+    IDEAS.write_text(json.dumps(ideas, indent=2))
+
+
 def yt_client():
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
@@ -66,8 +83,10 @@ def performance_notes(history):
             "Lean into the angles, topic types and title styles of the best; avoid those of the worst.")
 
 
-def write_script(history):
+def write_script(history, idea=None):
     import anthropic
+    assigned = (f"\nASSIGNED TOPIC (write this video; you may sharpen the title): {idea['title']} "
+                f"- angle: {idea.get('angle', '')}") if idea else ""
     past = [h["title"] for h in history]
     perf = performance_notes(history)
     n = CFG["scenes"]
@@ -75,10 +94,10 @@ def write_script(history):
     sent = "1-2 spoken sentences" if CFG["format"] == "short" else "3-4 spoken sentences"
     prompt = f"""You run a faceless YouTube channel about: {CFG['niche']}.
 Tone: {CFG['tone']}. Format: {CFG['format']} ({length}).
-Already published (do not repeat): {past[-40:]}{perf}
+Already published (do not repeat): {past[-40:]}{perf}{assigned}{assigned}
 
 Pick one fresh, specific, factually solid topic and write the video. Only state facts you are confident are true. Pick topics people actually search for (e.g. "how X works", "X vs Y", "mistakes to avoid"). Use rounded illustrative examples, never claim guaranteed returns, no specific stock/crypto picks. Title must promise a concrete payoff; description must start with the main keyword and end with "This video is educational, not financial advice."
-Scene 1 must open with a hook. The last scene ends with a one-line call to action to subscribe.
+Retention rules: scene 1 hooks within 5 seconds (a surprising number, a bold claim or a relatable problem; never 'in this video'), then opens a loop it pays off later. Every 2-3 scenes add a pattern interrupt (a question, a contrast, a concrete example). Deliver real value, with specific numbers and steps, not filler. The last scene gives a payoff recap and a one-line subscribe call to action.
 Return ONLY JSON:
 {{"title": "<=70 chars, curiosity-driven", "description": "2-3 sentences + hashtags", "tags": ["..."], "thumbnail_text": "2-4 punchy words, ALL CAPS, no punctuation",
  "scenes": [{{"narration": "{sent}", "search_query": "2-4 word stock-footage search, concrete visuals"}}]}}
@@ -245,7 +264,8 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     history = load_history()
-    script = write_script(history)
+    idea = next_idea()
+    script = write_script(history, idea)
     print("Title:", script["title"])
     video = render(script)
     thumb = make_thumbnail(video, script.get("thumbnail_text") or script["title"][:24])
@@ -254,6 +274,8 @@ def main():
         print("dry run complete:", video, thumb)
         return
     vid = upload(video, script, thumb)
+    if idea:
+        mark_used(idea["title"])
     HISTORY.write_text(json.dumps(history + [{"title": script["title"], "id": vid}], indent=2))
 
 

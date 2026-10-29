@@ -11,3 +11,9 @@
 
 Start with `"privacy": "private"` until you trust the output. Unverified Google API projects can only upload private videos until audited.
 Drop royalty-free .mp3 files in `faceless-yt/music/` and one is mixed in quietly under the voice.
+
+## Strategy automation (`strategy.py`)
+- `python strategy.py plan` → `STRATEGY.md` (positioning, content pillars, schedule, growth, monetization roadmap). Run once now.
+- `python strategy.py ideas` → `ideas.json`, 100 ranked ideas. The pipeline publishes the top unused one each run.
+- `python strategy.py review` → `REVIEW.md`, weekly analytics review.
+The weekly workflow refills ideas and writes the review every Monday. Run it manually once (choose `plan`, then `ideas-and-review`) before the first daily upload.

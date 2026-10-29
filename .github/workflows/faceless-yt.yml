@@ -36,4 +36,4 @@ jobs:
       - name: Save topic history
         run: |
           git config user.name "yt-bot" && git config user.email "yt-bot@users.noreply.github.com"
-          git add faceless-yt/history.json && (git commit -m "Update YT history" && git push) || true
+          git add faceless-yt/history.json faceless-yt/ideas.json && (git commit -m "Update YT history" && git push) || true
