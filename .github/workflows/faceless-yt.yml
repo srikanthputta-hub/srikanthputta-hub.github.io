@@ -30,7 +30,9 @@ jobs:
         run: python pipeline.py ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: video, path: faceless-yt/output/video.mp4 }
+        with: { name: video, path: |
+            faceless-yt/output/video.mp4
+            faceless-yt/output/thumbnail.jpg }
       - name: Save topic history
         run: |
           git config user.name "yt-bot" && git config user.email "yt-bot@users.noreply.github.com"

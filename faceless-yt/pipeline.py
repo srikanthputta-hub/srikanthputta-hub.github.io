@@ -29,20 +29,58 @@ def duration(path):
 
 
 # ---------- 1. idea + script ----------
-def write_script():
+def load_history():
+    h = json.loads(HISTORY.read_text()) if HISTORY.exists() else []
+    return [x if isinstance(x, dict) else {"title": x} for x in h]
+
+
+def yt_client():
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    creds = Credentials(None, refresh_token=os.environ["YT_REFRESH_TOKEN"],
+                        client_id=os.environ["YT_CLIENT_ID"], client_secret=os.environ["YT_CLIENT_SECRET"],
+                        token_uri="https://oauth2.googleapis.com/token")
+    return build("youtube", "v3", credentials=creds)
+
+
+def performance_notes(history):
+    """Refresh view counts for published videos; return a prompt snippet on what's working."""
+    ids = [h["id"] for h in history if h.get("id")][-50:]
+    if not ids or "YT_REFRESH_TOKEN" not in os.environ:
+        return ""
+    try:
+        items = yt_client().videos().list(part="statistics", id=",".join(ids)).execute()["items"]
+        views = {i["id"]: int(i["statistics"].get("viewCount", 0)) for i in items}
+    except Exception as e:  # never block a run on analytics
+        print("analytics skipped:", e)
+        return ""
+    for h in history:
+        if h.get("id") in views:
+            h["views"] = views[h["id"]]
+    ranked = sorted((h for h in history if "views" in h), key=lambda h: -h["views"])
+    if len(ranked) < 3:
+        return ""
+    top = "; ".join(f"{h['title']} ({h['views']} views)" for h in ranked[:3])
+    low = "; ".join(f"{h['title']} ({h['views']} views)" for h in ranked[-2:])
+    return (f"\nPerformance so far. Best: {top}. Worst: {low}. "
+            "Lean into the angles, topic types and title styles of the best; avoid those of the worst.")
+
+
+def write_script(history):
     import anthropic
-    past = json.loads(HISTORY.read_text()) if HISTORY.exists() else []
+    past = [h["title"] for h in history]
+    perf = performance_notes(history)
     n = CFG["scenes"]
     length = "under 55 seconds total" if CFG["format"] == "short" else "about 6 minutes total"
     sent = "1-2 spoken sentences" if CFG["format"] == "short" else "3-4 spoken sentences"
     prompt = f"""You run a faceless YouTube channel about: {CFG['niche']}.
 Tone: {CFG['tone']}. Format: {CFG['format']} ({length}).
-Already published (do not repeat): {past[-40:]}
+Already published (do not repeat): {past[-40:]}{perf}
 
 Pick one fresh, specific, factually solid topic and write the video. Only state facts you are confident are true. Pick topics people actually search for (e.g. "how X works", "X vs Y", "mistakes to avoid"). Use rounded illustrative examples, never claim guaranteed returns, no specific stock/crypto picks. Title must promise a concrete payoff; description must start with the main keyword and end with "This video is educational, not financial advice."
 Scene 1 must open with a hook. The last scene ends with a one-line call to action to subscribe.
 Return ONLY JSON:
-{{"title": "<=70 chars, curiosity-driven", "description": "2-3 sentences + hashtags", "tags": ["..."],
+{{"title": "<=70 chars, curiosity-driven", "description": "2-3 sentences + hashtags", "tags": ["..."], "thumbnail_text": "2-4 punchy words, ALL CAPS, no punctuation",
  "scenes": [{{"narration": "{sent}", "search_query": "2-4 word stock-footage search, concrete visuals"}}]}}
 Exactly {n} scenes."""
     msg = anthropic.Anthropic().messages.create(
@@ -152,15 +190,38 @@ def render(script):
     return final
 
 
+# ---------- 5b. thumbnail ----------
+def make_thumbnail(video, text):
+    from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+    frame = OUT / "frame.jpg"
+    sh("ffmpeg", "-y", "-ss", "1", "-i", OUT / "work" / "v0.mp4", "-frames:v", "1", frame)  # raw clip: no burned-in captions
+    img = Image.open(frame).convert("RGB")
+    W, H = 1280, 720
+    scale = max(W / img.width, H / img.height)
+    img = img.resize((int(img.width * scale), int(img.height * scale)))
+    img = img.crop(((img.width - W) // 2, (img.height - H) // 2, (img.width + W) // 2, (img.height + H) // 2))
+    img = ImageEnhance.Brightness(ImageEnhance.Color(img).enhance(1.4)).enhance(0.55)
+    d = ImageDraw.Draw(img)
+    font_path = next((f for f in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"] if os.path.exists(f)), None)
+    words = text.upper().split()
+    lines = [" ".join(words[:2]), " ".join(words[2:])] if len(words) > 2 else [" ".join(words)]
+    lines = [l for l in lines if l]
+    size = 190 if max(len(l) for l in lines) <= 9 else 140
+    font = ImageFont.truetype(font_path, size) if font_path else ImageFont.load_default()
+    y = (H - len(lines) * (size + 20)) // 2
+    for i, l in enumerate(lines):
+        w = d.textlength(l, font=font)
+        color = "#FFD400" if i == len(lines) - 1 else "white"
+        d.text(((W - w) / 2, y + i * (size + 20)), l, font=font, fill=color, stroke_width=10, stroke_fill="black")
+    out = OUT / "thumbnail.jpg"
+    img.save(out, quality=90)
+    return out
+
+
 # ---------- 6. upload ----------
-def upload(video, script):
-    from google.oauth2.credentials import Credentials
-    from googleapiclient.discovery import build
+def upload(video, script, thumb):
     from googleapiclient.http import MediaFileUpload
-    creds = Credentials(None, refresh_token=os.environ["YT_REFRESH_TOKEN"],
-                        client_id=os.environ["YT_CLIENT_ID"], client_secret=os.environ["YT_CLIENT_SECRET"],
-                        token_uri="https://oauth2.googleapis.com/token")
-    yt = build("youtube", "v3", credentials=creds)
+    yt = yt_client()
     title = script["title"] + (" #Shorts" if CFG["format"] == "short" and "#Shorts" not in script["title"] else "")
     body = {"snippet": {"title": title[:100], "description": script["description"],
                         "tags": script.get("tags", []), "categoryId": CFG["category_id"]},
@@ -172,22 +233,28 @@ def upload(video, script):
     while resp is None:
         _, resp = req.next_chunk()
     print("uploaded: https://youtu.be/" + resp["id"])
+    try:  # custom thumbnails require a phone-verified channel
+        yt.thumbnails().set(videoId=resp["id"], media_body=MediaFileUpload(str(thumb))).execute()
+    except Exception as e:
+        print("thumbnail not set:", e)
+    return resp["id"]
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
-    script = write_script()
+    history = load_history()
+    script = write_script(history)
     print("Title:", script["title"])
     video = render(script)
+    thumb = make_thumbnail(video, script.get("thumbnail_text") or script["title"][:24])
     (OUT / "script.json").write_text(json.dumps(script, indent=2))
     if args.dry_run:
-        print("dry run complete:", video)
+        print("dry run complete:", video, thumb)
         return
-    upload(video, script)
-    past = json.loads(HISTORY.read_text()) if HISTORY.exists() else []
-    HISTORY.write_text(json.dumps(past + [script["title"]], indent=2))
+    vid = upload(video, script, thumb)
+    HISTORY.write_text(json.dumps(history + [{"title": script["title"], "id": vid}], indent=2))
 
 
 if __name__ == "__main__":
