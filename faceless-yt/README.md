@@ -17,3 +17,8 @@ Drop royalty-free .mp3 files in `faceless-yt/music/` and one is mixed in quietly
 - `python strategy.py ideas` → `ideas.json`, 100 ranked ideas. The pipeline publishes the top unused one each run.
 - `python strategy.py review` → `REVIEW.md`, weekly analytics review.
 The weekly workflow refills ideas and writes the review every Monday. Run it manually once (choose `plan`, then `ideas-and-review`) before the first daily upload.
+
+## Quality gates
+- Every script gets a second Claude pass as fact-checker/compliance editor. If that pass fails the run aborts rather than publishing unchecked finance content.
+- Add affiliate links under `affiliate_links` in `config.json` as `[{"label": "...", "url": "..."}]`; they are appended to descriptions with a disclosure line. Only use programs you have actually joined.
+- `python -m pytest faceless-yt/tests` runs the offline tests (also run in CI).

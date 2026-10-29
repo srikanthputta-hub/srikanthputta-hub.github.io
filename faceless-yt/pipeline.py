@@ -84,7 +84,6 @@ def performance_notes(history):
 
 
 def write_script(history, idea=None):
-    import anthropic
     assigned = (f"\nASSIGNED TOPIC (write this video; you may sharpen the title): {idea['title']} "
                 f"- angle: {idea.get('angle', '')}") if idea else ""
     past = [h["title"] for h in history]
@@ -102,10 +101,48 @@ Return ONLY JSON:
 {{"title": "<=70 chars, curiosity-driven", "description": "2-3 sentences + hashtags", "tags": ["..."], "thumbnail_text": "2-4 punchy words, ALL CAPS, no punctuation",
  "scenes": [{{"narration": "{sent}", "search_query": "2-4 word stock-footage search, concrete visuals"}}]}}
 Exactly {n} scenes."""
-    msg = anthropic.Anthropic().messages.create(
-        model=MODEL, max_tokens=3000, messages=[{"role": "user", "content": prompt}])
-    text = msg.content[0].text
-    return json.loads(text[text.index("{"): text.rindex("}") + 1])
+    script = ask_json(prompt, CFG["scenes"])
+    return fact_check(script)
+
+
+def ask_json(prompt, n_scenes=None, tries=3):
+    """Call Claude for a JSON object; retry on malformed output or wrong scene count."""
+    import anthropic
+    err = None
+    for _ in range(tries):
+        try:
+            msg = anthropic.Anthropic().messages.create(
+                model=MODEL, max_tokens=6000, messages=[{"role": "user", "content": prompt}])
+            text = msg.content[0].text
+            data = json.loads(text[text.index("{"): text.rindex("}") + 1])
+            scenes = data["scenes"]
+            assert all(s.get("narration") and s.get("search_query") for s in scenes), "empty scene field"
+            assert data.get("title") and data.get("description"), "missing title/description"
+            if n_scenes:
+                assert abs(len(scenes) - n_scenes) <= 2, f"got {len(scenes)} scenes"
+            return data
+        except Exception as e:
+            err = e
+            print("script attempt failed:", e)
+            time.sleep(2)
+    raise RuntimeError(f"no valid script after {tries} tries: {err}")
+
+
+def fact_check(script):
+    """Second pass: an editor reviews the script for factual errors and risky financial claims."""
+    prompt = f"""You are a meticulous fact-checker and compliance editor for a personal-finance YouTube channel.
+Review this video script. Fix any factual error, outdated figure, misleading simplification, guaranteed-return or
+get-rich-quick claim, or specific investment recommendation. If you cannot be confident a statistic is correct,
+replace it with a clearly illustrative round example ("say you invest $100 a month...") or cut it. Keep the same JSON structure,
+scene count, tone and pacing. Return ONLY the corrected JSON.
+
+{json.dumps(script)}"""
+    try:
+        fixed = ask_json(prompt, len(script["scenes"]), tries=2)
+        fixed.setdefault("thumbnail_text", script.get("thumbnail_text"))
+        return fixed
+    except Exception as e:  # never publish less-checked content silently
+        raise RuntimeError(f"fact-check failed, refusing to publish unchecked script: {e}")
 
 
 # ---------- 2. voiceover ----------
@@ -128,15 +165,19 @@ async def _tts(text, path):
 
 
 # ---------- 3. footage ----------
+USED_CLIPS = set()
+
+
 def fetch_clip(query, dest, seconds):
     key = os.environ.get("PEXELS_API_KEY")
     if key:
         orient = "portrait" if CFG["format"] == "short" else "landscape"
         r = requests.get("https://api.pexels.com/videos/search", headers={"Authorization": key},
                          params={"query": query, "orientation": orient, "per_page": 15}, timeout=30)
-        vids = [v for v in r.json().get("videos", []) if v["duration"] >= 3]
+        vids = [v for v in r.json().get("videos", []) if v["duration"] >= 3 and v["id"] not in USED_CLIPS]
         if vids:
             v = random.choice(vids[:8])
+            USED_CLIPS.add(v["id"])
             files = sorted(v["video_files"], key=lambda f: abs(f["width"] - SIZE[0]))
             data = requests.get(files[0]["link"], timeout=120).content
             raw = dest.with_suffix(".src.mp4")
@@ -242,7 +283,9 @@ def upload(video, script, thumb):
     from googleapiclient.http import MediaFileUpload
     yt = yt_client()
     title = script["title"] + (" #Shorts" if CFG["format"] == "short" and "#Shorts" not in script["title"] else "")
-    body = {"snippet": {"title": title[:100], "description": script["description"],
+    links = "\n".join(f"{l['label']}: {l['url']}" for l in CFG.get("affiliate_links", []))
+    desc = script["description"] + (f"\n\n{links}\n(Some links may be affiliate links; I may earn a commission at no cost to you.)" if links else "")
+    body = {"snippet": {"title": title[:100], "description": desc,
                         "tags": script.get("tags", []), "categoryId": CFG["category_id"]},
             "status": {"privacyStatus": CFG["privacy"], "selfDeclaredMadeForKids": False,
                        "containsSyntheticMedia": True}}
