@@ -1,0 +1,6 @@
+anthropic>=0.40
+edge-tts>=6.1
+requests>=2.31
+google-api-python-client>=2.100
+google-auth>=2.23
+google-auth-oauthlib>=1.1

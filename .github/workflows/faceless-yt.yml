@@ -1,0 +1,37 @@
+name: Faceless YouTube
+on:
+  schedule:
+    - cron: "17 14 * * *"   # daily; edit to taste
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Render only, no upload"
+        type: boolean
+        default: true
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: faceless-yt/requirements.txt }
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - run: pip install -r faceless-yt/requirements.txt
+      - name: Run pipeline
+        working-directory: faceless-yt
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+        run: python pipeline.py ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: video, path: faceless-yt/output/video.mp4 }
+      - name: Save topic history
+        run: |
+          git config user.name "yt-bot" && git config user.email "yt-bot@users.noreply.github.com"
+          git add faceless-yt/history.json && (git commit -m "Update YT history" && git push) || true
