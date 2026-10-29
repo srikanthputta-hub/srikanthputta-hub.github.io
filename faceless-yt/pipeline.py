@@ -53,8 +53,21 @@ Exactly {n} scenes."""
 
 # ---------- 2. voiceover ----------
 async def _tts(text, path):
+    """Synthesize speech; return [(word, start_s, end_s)] from the engine's WordBoundary events."""
     import edge_tts
-    await edge_tts.Communicate(text, CFG["voice"]).save(str(path))
+    try:
+        comm = edge_tts.Communicate(text, CFG["voice"], boundary="WordBoundary")
+    except TypeError:  # older edge-tts emits word boundaries by default
+        comm = edge_tts.Communicate(text, CFG["voice"])
+    words = []
+    with open(path, "wb") as f:
+        async for ev in comm.stream():
+            if ev["type"] == "audio":
+                f.write(ev["data"])
+            elif ev["type"] == "WordBoundary":
+                s = ev["offset"] / 1e7
+                words.append((ev["text"], s, s + ev["duration"] / 1e7))
+    return words
 
 
 # ---------- 3. footage ----------
@@ -88,17 +101,16 @@ def ts(t):
     return f"{h:02}:{m:02}:{s:06.3f}".replace(".", ",")
 
 
-def build_srt(scenes, durs):
-    lines, t, i = [], 0.0, 1
-    for sc, d in zip(scenes, durs):
-        words = sc["narration"].split()
-        chunks = [" ".join(words[j:j + 4]) for j in range(0, len(words), 4)]
-        total = sum(len(c) for c in chunks)
-        for c in chunks:
-            seg = d * len(c) / total
-            lines.append(f"{i}\n{ts(t)} --> {ts(t + seg)}\n{c}\n")
-            t += seg
+def build_srt(timings, durs):
+    """timings: per-scene [(word, start, end)]; groups 4 words per caption at their true times."""
+    lines, offset, i = [], 0.0, 1
+    for words, d in zip(timings, durs):
+        for j in range(0, len(words), 4):
+            g = words[j:j + 4]
+            end = words[j + 4][1] if j + 4 < len(words) else g[-1][2] + 0.2
+            lines.append(f"{i}\n{ts(offset + g[0][1])} --> {ts(offset + end)}\n{' '.join(w[0] for w in g)}\n")
             i += 1
+        offset += d
     return "\n".join(lines)
 
 
@@ -107,10 +119,10 @@ def render(script):
     OUT.mkdir(exist_ok=True)
     work = OUT / "work"
     work.mkdir(exist_ok=True)
-    clips, audios, durs = [], [], []
+    clips, audios, durs, timings = [], [], [], []
     for i, sc in enumerate(script["scenes"]):
         a = work / f"a{i}.mp3"
-        asyncio.run(_tts(sc["narration"], a))
+        timings.append(asyncio.run(_tts(sc["narration"], a)))
         d = duration(a) + 0.25
         v = work / f"v{i}.mp4"
         fetch_clip(sc["search_query"], v, d)
@@ -119,16 +131,23 @@ def render(script):
     (work / "v.txt").write_text("".join(f"file '{c.resolve()}'\n" for c in clips))
     (work / "a.txt").write_text("".join(f"file '{a.resolve()}'\n" for a in audios))
     srt = work / "captions.srt"
-    srt.write_text(build_srt(script["scenes"], durs))
+    srt.write_text(build_srt(timings, durs))
     final = OUT / "video.mp4"
     size = 14 if CFG["format"] == "short" else 12
     style = (f"FontName=DejaVu Sans,Bold=1,FontSize={size * 2},PrimaryColour=&H00FFFFFF,"
              f"OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=" +
              ("260" if CFG["format"] == "short" else "60"))
-    sh("ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", work / "v.txt",
-       "-f", "concat", "-safe", "0", "-i", work / "a.txt",
-       "-vf", f"subtitles={srt}:force_style='{style}'",
-       "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+    tracks = sorted((HERE / "music").glob("*.mp3")) if (HERE / "music").exists() else []
+    cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", work / "v.txt",
+           "-f", "concat", "-safe", "0", "-i", work / "a.txt"]
+    vf = f"subtitles={srt}:force_style='{style}'"
+    if tracks:  # royalty-free tracks in faceless-yt/music/, mixed quietly under the voice
+        cmd += ["-stream_loop", "-1", "-i", random.choice(tracks)]
+        af = ["-filter_complex", f"[0:v]{vf}[v];[2:a]volume=0.08[m];[1:a][m]amix=inputs=2:duration=first:normalize=0[a]",
+              "-map", "[v]", "-map", "[a]"]
+    else:
+        af = ["-vf", vf]
+    sh(*cmd, *af, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
        "-c:a", "aac", "-b:a", "160k", "-shortest", final)
     return final
 

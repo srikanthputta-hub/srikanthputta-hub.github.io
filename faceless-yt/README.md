@@ -10,3 +10,4 @@
 5. Run the workflow manually with dry_run on, check the video artifact, then let the schedule run (manual runs default to dry-run; scheduled runs upload).
 
 Start with `"privacy": "private"` until you trust the output. Unverified Google API projects can only upload private videos until audited.
+Drop royalty-free .mp3 files in `faceless-yt/music/` and one is mixed in quietly under the voice.
