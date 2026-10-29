@@ -33,16 +33,17 @@ def write_script():
     import anthropic
     past = json.loads(HISTORY.read_text()) if HISTORY.exists() else []
     n = CFG["scenes"]
-    length = "under 55 seconds total" if CFG["format"] == "short" else "about 5 minutes total"
+    length = "under 55 seconds total" if CFG["format"] == "short" else "about 6 minutes total"
+    sent = "1-2 spoken sentences" if CFG["format"] == "short" else "3-4 spoken sentences"
     prompt = f"""You run a faceless YouTube channel about: {CFG['niche']}.
 Tone: {CFG['tone']}. Format: {CFG['format']} ({length}).
 Already published (do not repeat): {past[-40:]}
 
-Pick one fresh, specific, factually solid topic and write the video. Only state facts you are confident are true.
+Pick one fresh, specific, factually solid topic and write the video. Only state facts you are confident are true. Pick topics people actually search for (e.g. "how X works", "X vs Y", "mistakes to avoid"). Use rounded illustrative examples, never claim guaranteed returns, no specific stock/crypto picks. Title must promise a concrete payoff; description must start with the main keyword and end with "This video is educational, not financial advice."
 Scene 1 must open with a hook. The last scene ends with a one-line call to action to subscribe.
 Return ONLY JSON:
 {{"title": "<=70 chars, curiosity-driven", "description": "2-3 sentences + hashtags", "tags": ["..."],
- "scenes": [{{"narration": "1-2 spoken sentences", "search_query": "2-4 word stock-footage search, concrete visuals"}}]}}
+ "scenes": [{{"narration": "{sent}", "search_query": "2-4 word stock-footage search, concrete visuals"}}]}}
 Exactly {n} scenes."""
     msg = anthropic.Anthropic().messages.create(
         model=MODEL, max_tokens=3000, messages=[{"role": "user", "content": prompt}])

@@ -3,7 +3,7 @@
 `pipeline.py`: Claude picks a fresh topic and writes the script → edge-tts voiceover → Pexels stock footage → burned-in captions (ffmpeg) → YouTube upload. `.github/workflows/faceless-yt.yml` runs it daily.
 
 ## Setup
-1. Edit `config.json` (niche, `short` or `long` format, voice, privacy).
+1. Edit `config.json` (niche is preset to beginner personal finance, long-form).
 2. Keys: Anthropic (console.anthropic.com), Pexels (free, pexels.com/api).
 3. YouTube: Google Cloud → enable YouTube Data API v3 → OAuth client (Desktop) → download `client_secret.json` → `python get_refresh_token.py client_secret.json`.
 4. GitHub repo → Settings → Secrets → Actions: `ANTHROPIC_API_KEY`, `PEXELS_API_KEY`, `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`.

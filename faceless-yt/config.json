@@ -1,9 +1,9 @@
 {
-  "niche": "surprising facts about space and the universe",
-  "tone": "curious, punchy, easy to follow, no filler",
-  "format": "short",
-  "scenes": 8,
+  "niche": "personal finance for beginners: saving, investing basics, debt payoff, credit scores, taxes, money psychology",
+  "tone": "clear, trustworthy, conversational explainer; concrete numbers and examples; no hype, no get-rich-quick claims",
+  "format": "long",
+  "scenes": 14,
   "voice": "en-US-AndrewNeural",
-  "privacy": "public",
+  "privacy": "private",
   "category_id": "27"
 }
