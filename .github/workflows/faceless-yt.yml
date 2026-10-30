@@ -10,6 +10,7 @@ on:
         default: true
 permissions:
   contents: write
+  issues: write
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -39,3 +40,14 @@ jobs:
         run: |
           git config user.name "yt-bot" && git config user.email "yt-bot@users.noreply.github.com"
           git add faceless-yt/history.json faceless-yt/ideas.json && (git commit -m "Update YT history" && git push) || true
+      - name: Open an issue if the run failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Faceless YouTube run failed"
+          if [ -z "$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')" ]; then
+            gh issue create --title "$title" --body "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+If the log says the refresh token was rejected, re-run get_refresh_token.py and update the YT_REFRESH_TOKEN secret (tokens expire every 7 days while the Google app is in Testing)."
+          fi

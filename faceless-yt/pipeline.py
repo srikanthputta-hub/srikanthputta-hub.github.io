@@ -52,11 +52,20 @@ def mark_used(title):
 
 
 def yt_client():
+    from google.auth.exceptions import RefreshError
+    from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     creds = Credentials(None, refresh_token=os.environ["YT_REFRESH_TOKEN"],
                         client_id=os.environ["YT_CLIENT_ID"], client_secret=os.environ["YT_CLIENT_SECRET"],
                         token_uri="https://oauth2.googleapis.com/token")
+    try:
+        creds.refresh(Request())  # fail early, before any rendering work is wasted
+    except RefreshError as e:
+        raise RuntimeError(
+            "YouTube refresh token rejected (expired or revoked). Apps in Google 'Testing' mode expire tokens "
+            "every 7 days. Re-run get_refresh_token.py and update the YT_REFRESH_TOKEN secret. "
+            f"Details: {e}")
     return build("youtube", "v3", credentials=creds)
 
 
