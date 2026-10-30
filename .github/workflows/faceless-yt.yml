@@ -44,10 +44,10 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           title="Faceless YouTube run failed"
-          if [ -z "$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')" ]; then
-            gh issue create --title "$title" --body "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-If the log says the refresh token was rejected, re-run get_refresh_token.py and update the YT_REFRESH_TOKEN secret (tokens expire every 7 days while the Google app is in Testing)."
+          existing="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')"
+          if [ -z "$existing" ]; then
+            gh issue create --title "$title" --body "Run: $RUN_URL. If the log says the refresh token was rejected, re-run get_refresh_token.py and update the YT_REFRESH_TOKEN secret (tokens expire every 7 days while the Google app is in Testing)."
           fi
