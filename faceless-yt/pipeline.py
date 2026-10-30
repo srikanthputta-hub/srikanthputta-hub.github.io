@@ -92,6 +92,7 @@ def write_script(history, idea=None):
     length = "under 55 seconds total" if CFG["format"] == "short" else "about 6 minutes total"
     sent = "1-2 spoken sentences" if CFG["format"] == "short" else "3-4 spoken sentences"
     prompt = f"""You run a faceless YouTube channel about: {CFG['niche']}.
+Audience: {CFG['audience']}.
 Tone: {CFG['tone']}. Format: {CFG['format']} ({length}).
 Already published (do not repeat): {past[-40:]}{perf}{assigned}{assigned}
 
