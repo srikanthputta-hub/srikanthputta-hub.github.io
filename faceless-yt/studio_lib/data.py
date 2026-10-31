@@ -156,5 +156,11 @@ def fact_sheet(charts):
                        f"low {fmt_v(lo[1], ch['unit'])} ({fmt_t(lo[0], g)}); change {chg:+,.1f}")
             allowed.update([first[1], last[1], hi[1], lo[1], chg, abs(chg), hi[1] - lo[1]])
             lasts.append(last[1])
+            steps = [(abs(b[1] - a[1]), a, b) for a, b in zip(pts, pts[1:])]
+            if steps:  # the Researcher's highlight for the Writer: the single biggest move in the series
+                size, a, b = max(steps, key=lambda s: s[0])
+                out.append(f"    Highlight: biggest single move was {fmt_t(a[0], g)} to {fmt_t(b[0], g)}, from {fmt_v(a[1], ch['unit'])} to "
+                           f"{fmt_v(b[1], ch['unit'])} (change {b[1] - a[1]:+,.1f})")
+                allowed.update([a[1], b[1], b[1] - a[1], size])
         allowed.update(abs(a - b) for i, a in enumerate(lasts) for b in lasts[i + 1:])
     return "\n".join(out), sorted(allowed)

@@ -30,7 +30,7 @@ The weekly workflow refills ideas and writes the review every Monday. Run it man
 ## The studio (v1)
 `python studio.py [--dry-run]` runs the whole production line, one named role at a time, behind QA gates. Niche: **how money and the economy work, explained with real public data** (educational, never advice).
 
-Roles and handoffs: Head of Content -> Researcher -> Data Analyst (downloads FRED / World Bank data, writes the fact sheet) -> Scriptwriter (outline, then act by act) -> Fact-checker + Policy Editor (up to 2 revision rounds) -> Originality Editor -> Director -> Chart Designer (animated charts from the real data) -> Voice Actor / Video Editor -> Thumbnail Designer -> Publisher (chapters, sources, AI-narration disclosure) -> Producer.
+Roles and handoffs: Producer (idea, final gate) -> Researcher (FRED / World Bank data, fact sheet) -> pre-production meeting (Writer + Editor + Designer agree outline and chart placement) -> Writer (draft) -> Editor (fact, policy and originality review, up to 3 rounds) -> Designer (visuals, animated charts, thumbnail) -> Post-Production (voice and render) -> packaging meeting (Publisher + Designer) -> Publisher (chapters, sources, AI-narration disclosure). Roles pass notes to each other so every step builds on the last.
 
 Gates (all must pass or nothing uploads): real data for at least 2 charts; script length and structure; every figure traces to the fact sheet; no advice, expert-persona or hype language; distinct from earlier scripts and has its own point of view; video long enough for mid-roll ads (`min_minutes`). A blocked run is a normal outcome: it is recorded and nothing ships.
 

@@ -1,42 +1,26 @@
-"""Studio roster. Mirrors the S.P.E.H.R. Office idea: named roles with a clear job, a department and a handoff order.
+"""Studio roster: eight desks, grouped by the aspect of the work they own.
 
-kind: "llm" = calls a language model; "code" = deterministic code; "human" = you and the Claude Code session.
+kind: "llm" = leans on a language model; "code" = deterministic code; "human" = you and the Claude Code session.
+Handoff order: Producer -> Researcher -> Writer <-> Editor -> Designer -> Post-Production -> Publisher -> Producer (final call).
 """
 ROLES = [
-    {"id": "head_of_content", "title": "Head of Content", "dept": "Editorial", "kind": "llm",
-     "summary": "Picks the next topic and angle from the idea backlog and what performed; owns the calendar."},
-    {"id": "researcher", "title": "Researcher", "dept": "Editorial", "kind": "llm",
-     "summary": "Chooses which real public datasets answer the question and what to chart."},
-    {"id": "data_analyst", "title": "Data Analyst", "dept": "Editorial", "kind": "code",
-     "summary": "Downloads FRED / World Bank data and writes the fact sheet: the only numbers a script may cite."},
-    {"id": "scriptwriter", "title": "Scriptwriter", "dept": "Editorial", "kind": "llm",
-     "summary": "Writes the outline, then the script act by act, quoting only the fact sheet."},
-    {"id": "fact_checker", "title": "Fact-checker", "dept": "Standards", "kind": "llm",
-     "summary": "Checks every claim against the fact sheet and flags anything doubtful."},
-    {"id": "policy_editor", "title": "Policy Editor", "dept": "Standards", "kind": "llm",
-     "summary": "Enforces YouTube monetization rules: no advice, no expert persona, no hype or predictions."},
-    {"id": "originality_editor", "title": "Originality Editor", "dept": "Standards", "kind": "code",
-     "summary": "Blocks repetitive or templated scripts and requires a real point of view."},
-    {"id": "director", "title": "Director", "dept": "Production", "kind": "code",
-     "summary": "Assigns charts and concrete b-roll to scenes and checks pacing."},
-    {"id": "chart_designer", "title": "Chart Designer", "dept": "Production", "kind": "code",
-     "summary": "Animates the real data into branded charts."},
-    {"id": "voice_actor", "title": "Voice Actor", "dept": "Production", "kind": "code",
-     "summary": "Records the narration (free neural TTS) with word-accurate captions."},
-    {"id": "video_editor", "title": "Video Editor", "dept": "Production", "kind": "code",
-     "summary": "Cuts footage, charts, callouts, music and captions into the final video."},
-    {"id": "thumbnail_designer", "title": "Thumbnail Designer", "dept": "Production", "kind": "code",
-     "summary": "Builds the thumbnail from the best frame or an AI background."},
-    {"id": "publisher", "title": "Publisher", "dept": "Publishing & Growth", "kind": "code",
-     "summary": "Writes chapters, sources and disclosure, then uploads."},
-    {"id": "producer", "title": "Producer", "dept": "Publishing & Growth", "kind": "code",
-     "summary": "Final go / no-go: every gate must pass or nothing ships."},
-    {"id": "analyst", "title": "Channel Analyst", "dept": "Publishing & Growth", "kind": "llm",
-     "summary": "Weekly review of views and retention; feeds the Head of Content."},
-    {"id": "ops", "title": "Operations", "dept": "Operations", "kind": "code",
-     "summary": "Watches every run and opens an issue when something breaks."},
+    {"id": "producer", "title": "Producer", "dept": "Newsroom", "kind": "llm",
+     "summary": "Picks each topic and angle, convenes the team, and makes the final go / no-go: every gate must pass or nothing ships."},
+    {"id": "researcher", "title": "Researcher", "dept": "Newsroom", "kind": "llm",
+     "summary": "Finds the real data that answers the question, downloads it, and hands the team a fact sheet with the biggest moves highlighted."},
+    {"id": "writer", "title": "Writer", "dept": "Newsroom", "kind": "llm",
+     "summary": "Outlines the video, writes the script act by act from the fact sheet, and revises it with the Editor's notes."},
+    {"id": "editor", "title": "Editor", "dept": "Standards", "kind": "llm",
+     "summary": "The quality gate: pre-flights the outline, fact-checks every figure, enforces YouTube's rules (no advice, persona or hype) and blocks repeats."},
+    {"id": "designer", "title": "Designer", "dept": "Production", "kind": "llm",
+     "summary": "Plans the visuals from the finished script (animated charts, concrete footage, callouts) and designs a thumbnail that matches the title."},
+    {"id": "post_production", "title": "Post-Production", "dept": "Production", "kind": "code",
+     "summary": "Records the narration and cuts voice, charts, footage, captions and music into the final video."},
+    {"id": "publisher", "title": "Publisher", "dept": "Publishing & Growth", "kind": "llm",
+     "summary": "Writes the title, description and chapters, uploads, and reviews how the channel is doing."},
     {"id": "boss", "title": "Boss (you + Claude Code)", "dept": "Operations", "kind": "human",
      "summary": "Sets priorities, owns secrets and approvals; dispatches the Claude Code roster to build and maintain the studio."},
 ]
 
 ROLE_IDS = [r["id"] for r in ROLES]
+FLOW = ["producer", "researcher", "writer", "editor", "designer", "post_production", "publisher"]  # desks around the board, boss sits at the bottom

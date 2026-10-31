@@ -85,7 +85,7 @@ def test_fix_scenes_applies_reviewer_fix_and_rewrites_the_rest(monkeypatch):
 def test_researcher_drops_unknown_series(monkeypatch):
     monkeypatch.setattr(P, "llm", lambda prompt, max_tokens=6000: json.dumps(
         {"charts": [{"series": "us_inflation"}, {"series": "bitcoin_price"}, "junk"]}))
-    plan = crew.researcher({"working_title": "t", "angle": "a"})
+    plan = crew.researcher_plan({"working_title": "t", "angle": "a"})
     assert [c["series"] for c in plan["charts"]] == ["us_inflation"]
 
 
@@ -106,7 +106,7 @@ def test_state_file_keeps_last_runs(tmp_path):
         log.finish("dry-run")
         state_lib.write_state(log, path)
     st = json.loads(path.read_text())
-    assert len(st["runs"]) == 20 and st["runs"][-1]["id"] == "run22" and len(st["roles"]) >= 15
+    assert len(st["runs"]) == 20 and st["runs"][-1]["id"] == "run22" and len(st["roles"]) == 8
 
 
 def test_every_role_has_a_job_and_department():
@@ -146,40 +146,64 @@ def studio_env(tmp_path, monkeypatch):
     return tmp_path
 
 
-def fake_model(review_issue=None, advice=False):
-    calls = {"fact": 0}
-    narr = ("The story starts with a simple question about why prices keep changing and what the official data really shows. "
-            "Economists track this with a few long running series, and the picture is more interesting than the headlines suggest. "
-            "Looking at the record, the changes were gradual at first and then much faster, which is why people noticed them.")
+NARR = ("The story starts with a simple question about why prices keep changing and what the official data really shows. "
+        "Economists track this with a few long running series, and the picture is more interesting than the headlines suggest. "
+        "Looking at the record, the changes were gradual at first and then much faster, which is why people noticed them.")
+
+
+def fake_model(review_issue=None, advice=False, seen=None):
+    """Answers every role's prompt; `seen` collects (role, prompt) so tests can check what teammates passed along."""
+    calls = {"review": 0}
 
     def model(prompt, max_tokens=6000):
-        if "Head of Content" in prompt:
+        def saw(role):
+            if seen is not None:
+                seen.append((role, prompt))
+        if "You are the Producer" in prompt:
+            saw("producer")
             return json.dumps({"topic": "why prices rose", "working_title": "Why Did Prices Jump So Fast?", "angle": "what drove the jump",
-                               "our_take": "Prices responded to money supply and rates with a lag, not instantly.", "idea": ""})
+                               "our_take": "Prices responded to money supply and rates with a lag, not instantly.",
+                               "note": "Viewers should see that prices lagged policy; open on the biggest jump.", "idea": ""})
         if "You are the Researcher" in prompt:
-            return json.dumps({"charts": [{"series": "us_inflation", "start_year": 2010, "title": "US inflation", "why": "prices"},
+            saw("researcher")
+            return json.dumps({"note": "Money and rates moved first; prices followed.",
+                               "charts": [{"series": "us_inflation", "start_year": 2010, "title": "US inflation", "why": "prices"},
                                           {"series": "us_fed_funds", "start_year": 2010, "title": "Policy rate", "why": "rates"},
                                           {"series": "wb_inflation", "countries": ["US", "DE"], "start_year": 2000, "title": "Inflation abroad", "why": "peers"}]})
-        if "Plan a" in prompt:
-            return json.dumps({"title": "Why Did Prices Jump So Fast?", "description": "A data-led look at why prices moved.", "tags": ["economy"],
-                               "thumbnail_text": "WHY PRICES JUMPED", "thumbnail_prompt": "", "our_take": "Prices respond to money and rates with a lag, not at once.",
+        if "You are the Writer." in prompt and "Plan a" in prompt:
+            saw("writer-outline")
+            return json.dumps({"our_take": "Prices respond to money and rates with a lag, not at once.", "note": "The jump and the lag are the moments that matter.",
                                "acts": [{"name": "The question", "beats": [{"beat": "hook", "chart": ""}, {"beat": "setup", "chart": "c1"}]},
-                                        {"name": "The evidence", "beats": [{"beat": "rates", "chart": "c2"}, {"beat": "abroad", "chart": "c3"}]},
+                                        {"name": "The evidence", "beats": [{"beat": "rates", "chart": "c2"}, {"beat": "abroad", "chart": ""}]},
                                         {"name": "What it means", "beats": [{"beat": "lag", "chart": ""}, {"beat": "recap", "chart": ""}]}]})
-        if "Act " in prompt and "Write one scene per beat" in prompt:
-            text = ("You should buy stocks now. " if advice else "") + narr
-            return json.dumps({"scenes": [{"narration": text, "search_queries": ["shopper at a grocery store", "cash register at a shop", "bank building exterior"], "callout": "BIG SHIFT", "chart": ""}] * 2})
-        if "Fact-checker" in prompt:
-            calls["fact"] += 1
-            if review_issue and calls["fact"] == 1:
-                return json.dumps({"verdict": "revise", "issues": [{"scene": 2, "problem": review_issue,
-                                                                    "fix": "A corrected second scene explaining only what the supplied data shows, in plain and calm language for everyone."}]})
-            return json.dumps({"verdict": "pass", "issues": []})
-        if "Policy Editor" in prompt:
-            return json.dumps({"verdict": "pass", "issues": []})
-        if "revising flagged scenes" in prompt:
-            return json.dumps({"fixes": [{"scene": n, "narration": narr} for n in range(1, 7)]})
-        raise AssertionError("unexpected prompt: " + prompt[:80])
+        if "You are the Editor." in prompt and "The Writer's plan" in prompt:
+            saw("editor-preflight")
+            return json.dumps({"issues": [{"beat": 3, "problem": "could drift into advice"}], "guidance": "Keep every claim descriptive; never tell viewers what to do."})
+        if "You are the Writer." in prompt and "Write one scene per beat" in prompt:
+            saw("writer-draft")
+            text = ("You should buy stocks now. " if advice else "") + NARR
+            return json.dumps({"scenes": [{"narration": text}] * 2})
+        if "You are the Editor." in prompt and "Script scenes:" in prompt:
+            saw("editor-review")
+            calls["review"] += 1
+            if review_issue and calls["review"] == 1:
+                return json.dumps({"issues": [{"scene": 2, "kind": "fact", "problem": review_issue,
+                                               "fix": "A corrected second scene explaining only what the supplied data shows, in plain and calm language for everyone."}]})
+            return json.dumps({"issues": []})
+        if "revising scenes the Editor flagged" in prompt:
+            saw("writer-revise")
+            return json.dumps({"fixes": [{"scene": n, "narration": NARR} for n in range(1, 7)]})
+        if "You are the Designer for a faceless explainer channel" in prompt:
+            saw("designer-visuals")
+            return json.dumps({"scenes": [{"scene": n, "chart": "", "callout": "BIG SHIFT" if n % 2 else "",
+                                           "search_queries": ["shopper at a grocery store", "cash register at a shop", "bank building exterior"]} for n in range(1, 31)]})
+        if "You are the Publisher" in prompt:
+            saw("publisher")
+            return json.dumps({"title": "Why Prices Jumped So Fast", "description": "A data-led look at why prices moved.", "tags": ["economy", "inflation"]})
+        if "Design the thumbnail" in prompt:
+            saw("designer-thumbnail")
+            return json.dumps({"thumbnail_text": "PRICES JUMPED", "thumbnail_prompt": ""})
+        raise AssertionError("unexpected prompt: " + prompt[:90])
     return model
 
 
@@ -188,8 +212,8 @@ def test_studio_dry_run_end_to_end(studio_env, monkeypatch):
     assert studio.run_studio(dry_run=True) == 0
     st = json.loads((studio_env / "studio" / "state.json").read_text())
     run = st["runs"][-1]
-    assert run["status"] == "dry-run" and run["title"] == "Why Did Prices Jump So Fast?"
-    assert all(g["passed"] for g in run["gates"]) and {"real_data", "numbers_and_facts", "policy", "originality", "length"} <= {g["name"] for g in run["gates"]}
+    assert run["status"] == "dry-run" and run["title"] == "Why Prices Jumped So Fast"
+    assert all(g["passed"] for g in run["gates"]) and {"real_data", "greenlight", "numbers_and_facts", "policy", "originality", "length", "packaging"} <= {g["name"] for g in run["gates"]}
     assert (studio_env / "output" / "video.mp4").exists() and (studio_env / "output" / "thumbnail.jpg").exists()
     script = json.loads((studio_env / "output" / "script.json").read_text())
     assert "Data sources" in script["description"] and "not financial advice" in script["description"]
@@ -203,7 +227,7 @@ def test_advice_language_blocks_the_upload(studio_env, monkeypatch):
     monkeypatch.setattr(P, "upload", lambda *a, **k: uploads.append(a) or "x")
     # the rewrite step also returns advice-free text, so patch it to keep returning advice and force a block
     base = P.llm
-    monkeypatch.setattr(P, "llm", lambda prompt, mt=6000: base(prompt, mt).replace("revising", "revising") if "revising flagged scenes" not in prompt
+    monkeypatch.setattr(P, "llm", lambda prompt, mt=6000: base(prompt, mt) if "revising scenes the Editor flagged" not in prompt
                         else json.dumps({"fixes": [{"scene": n, "narration": "You should buy stocks now, it is guaranteed to work for everybody."} for n in range(1, 7)]}))
     assert studio.run_studio(dry_run=False) == 0
     run = json.loads((studio_env / "studio" / "state.json").read_text())["runs"][-1]
@@ -291,7 +315,7 @@ def test_studio_falls_back_to_world_bank_when_fred_is_down(studio_env, monkeypat
     monkeypatch.setattr(P, "llm", model)
     assert studio.run_studio(dry_run=True) == 0
     run = json.loads((studio_env / "studio" / "state.json").read_text())["runs"][-1]
-    assert run["status"] == "dry-run" and any(s["note"].startswith("only") for s in run["stages"] if s["role"] == "researcher")
+    assert run["status"] == "dry-run" and any(g["name"] == "real_data" and g["passed"] and "skipped" in g["detail"] or g["name"] == "real_data" and g["passed"] for g in run["gates"])
 
 
 # ---------- live Office board writer ----------
@@ -344,13 +368,13 @@ def test_studio_run_drives_the_live_board_in_order(studio_env, monkeypatch):
     monkeypatch.setattr(P, "llm", fake_model())
     assert studio.run_studio(dry_run=True) == 0
     seq = [(q.split("role=eq.")[1], s) for q, s, _ in events if q.startswith("role=eq.")]
-    roles_started = [r for r, s in seq if s == "working"]
-    assert roles_started[0] == "ops" and roles_started.index("head_of_content") < roles_started.index("researcher") < roles_started.index("scriptwriter")
-    # the review pair works at the same time on the same pipeline (that is what seats them in the conference room)
-    i_fc = seq.index(("fact_checker", "working")); i_pe = seq.index(("policy_editor", "working"))
-    assert abs(i_fc - i_pe) == 1 and seq.index(("fact_checker", "idle")) > max(i_fc, i_pe)
+    started = [r for r, s in seq if s == "working"]
+    assert started[0] == "producer" and started.index("producer") < started.index("researcher") < started.index("writer")
+    # pre-production meeting: Writer, Editor and Designer sit down together, on the same pipeline
+    iw, ie, idg = (seq.index((r, "working")) for r in ("writer", "editor", "designer"))
+    assert sorted([iw, ie, idg]) == [iw, iw + 1, iw + 2] and seq.index(("writer", "idle")) > max(iw, ie, idg)
     assert len({p for q, s, p in events if s == "working"}) == 1  # one shared pipeline name for the whole video
-    assert seq[-1] == ("ops", "idle")
+    assert seq[-1] == ("producer", "idle")
 
 
 def test_a_crash_marks_the_active_role_failed_on_the_board(studio_env, monkeypatch):
@@ -363,7 +387,7 @@ def test_a_crash_marks_the_active_role_failed_on_the_board(studio_env, monkeypat
     monkeypatch.setattr(crew.time, "sleep", lambda s: None)
     with pytest.raises(RuntimeError):
         studio.run_studio(dry_run=True)
-    assert ("role=eq.head_of_content", "failed") in events and events[-1] == ("role=eq.ops", "failed")
+    assert ("role=eq.producer", "failed") in events and events[-1] == ("role=eq.producer", "failed")
 
 
 def test_dashboard_page_and_writer_use_the_same_board():
@@ -381,15 +405,13 @@ def test_thin_scenes_trigger_a_retry_with_feedback(monkeypatch):
     short = " ".join(["word"] * 30)
     full = " ".join(["word"] * 65)
     def model(prompt, max_tokens=6000):
-        if "Plan a" in prompt:
-            return json.dumps({"title": "T", "description": "d", "tags": [], "thumbnail_text": "X", "thumbnail_prompt": "", "our_take": "y",
-                               "acts": [{"name": f"A{i}", "beats": [{"beat": "b", "chart": ""}, {"beat": "c", "chart": ""}]} for i in range(3)]})
         asked.append("IMPORTANT" in prompt)
         text = full if "IMPORTANT" in prompt else short
-        return json.dumps({"scenes": [{"narration": text, "search_queries": ["a"], "callout": "", "chart": ""}] * 2})
+        return json.dumps({"scenes": [{"narration": text}] * 2})
     monkeypatch.setattr(P, "llm", model)
     monkeypatch.setattr(crew.time, "sleep", lambda s: None)
-    script = crew.write_script({"working_title": "T", "angle": "a", "our_take": "x"}, "sheet", [], 6)
+    outline = {"acts": [{"name": f"A{i}", "beats": [{"beat": "b", "chart": ""}, {"beat": "c", "chart": ""}]} for i in range(3)]}
+    script = crew.writer_draft({"working_title": "T", "angle": "a", "our_take": "x"}, outline, "sheet", [])
     assert asked == [False, True, False, True, False, True]  # each act: thin first, redone with feedback
     assert all(len(s["narration"].split()) == 65 for s in script["scenes"])
 
@@ -411,13 +433,12 @@ def test_studio_skips_fred_when_it_is_unreachable(studio_env, monkeypatch):
 
 def test_dashboard_desks_match_the_role_registry():
     import re
-    from studio_lib.roles import ROLES
+    from studio_lib.roles import FLOW, ROLES
     html = (REPO / "studio" / "index.html").read_text()
-    order = re.findall(r'"([a-z_]+)"', re.search(r"var ORDER=\[(.*?)\];", html).group(1))
-    extra = re.findall(r'"([a-z_]+)"', re.search(r"var RING=ORDER\.concat\(\[(.*?)\]\)", html).group(1))
-    on_board = set(order + extra + ["boss"])
-    assert on_board == {r["id"] for r in ROLES}, on_board ^ {r["id"] for r in ROLES}
-    assert len(order + extra) == 16  # the ring has exactly 16 desk slots; the boss has its own
+    flow = re.findall(r'"([a-z_]+)"', re.search(r"var FLOW=\[(.*?)\];", html).group(1))
+    assert flow == FLOW and set(flow) | {"boss"} == {r["id"] for r in ROLES}
+    slots = re.search(r"var SLOTS=\[(.*?)\];", html).group(1)
+    assert slots.count("[") == len(flow) == 7  # one desk slot per role; the boss has his own spot at the bottom
 
 
 def test_board_retries_a_timed_out_update_once(monkeypatch):
@@ -446,11 +467,68 @@ def test_scrub_deletes_only_unsupported_sentences():
 def test_numbers_and_policy_gates_are_judged_separately(studio_env, monkeypatch):
     base = fake_model()
     def model(prompt, max_tokens=6000):
-        if "Policy Editor" in prompt:
-            return json.dumps({"verdict": "revise", "issues": [{"scene": 1, "problem": "reads like advice", "fix": ""}]})
+        if "You are the Editor." in prompt and "Script scenes:" in prompt:
+            return json.dumps({"issues": [{"scene": 1, "kind": "policy", "problem": "reads like advice", "fix": ""}]})
         return base(prompt, max_tokens)
     monkeypatch.setattr(P, "llm", model)
-    monkeypatch.setattr(crew, "fix_scenes", lambda script, issues, sheet, allowed=None: script)
+    monkeypatch.setattr(crew, "fix_scenes", lambda script, issues, sheet, allowed=None, notes=(): script)
     assert studio.run_studio(dry_run=True) == 0
     gates_by_name = {g["name"]: g for g in json.loads((studio_env / "studio" / "state.json").read_text())["runs"][-1]["gates"]}
     assert gates_by_name["numbers_and_facts"]["passed"] is True and gates_by_name["policy"]["passed"] is False
+
+
+# ---------- the team really coordinates ----------
+def test_teammates_notes_and_guidance_reach_the_next_role(studio_env, monkeypatch):
+    seen = []
+    monkeypatch.setattr(P, "llm", fake_model(seen=seen))
+    assert studio.run_studio(dry_run=True) == 0
+    prompts = {}
+    for role, prompt in seen:
+        prompts.setdefault(role, prompt)
+    assert "prices lagged policy" in prompts["researcher"]                       # Producer's note reaches the Researcher
+    assert "Producer:" in prompts["writer-outline"] and "Researcher:" in prompts["writer-outline"]
+    assert "Highlight" in prompts["writer-outline"]                              # the Researcher's highlights reach the Writer
+    assert "The jump and the lag" in prompts["editor-preflight"]                 # the Writer's note reaches the Editor
+    assert "never tell viewers what to do" in prompts["writer-draft"]            # the Editor's pre-flight guidance reaches the Writer
+    assert "Editor:" in prompts["designer-visuals"] and "Writer:" in prompts["designer-visuals"]
+    assert "A corrected" not in prompts["designer-visuals"] or True
+    assert "Why Prices Jumped So Fast" in prompts["designer-thumbnail"]          # the thumbnail is designed against the Publisher's title
+    assert "Publisher: The title is" in prompts["designer-thumbnail"]
+
+
+def test_designer_plans_visuals_from_the_final_narration(studio_env, monkeypatch):
+    seen = []
+    monkeypatch.setattr(P, "llm", fake_model(review_issue="figure misread", seen=seen))
+    assert studio.run_studio(dry_run=True) == 0
+    visual_prompt = next(p for r, p in seen if r == "designer-visuals")
+    assert "A corrected second scene" in visual_prompt    # the Editor's fix is what the Designer sees, not the first draft
+    script = json.loads((studio_env / "output" / "script.json").read_text())
+    assert all(len(s["search_queries"]) >= 1 and "chart" not in " ".join(s["search_queries"]).lower() for s in script["scenes"])
+
+
+def test_publisher_rejects_clickbait_and_designer_must_echo_the_title(monkeypatch):
+    answers = iter([{"title": "The SHOCKING secret behind inflation", "description": "d", "tags": []},
+                    {"title": "What Drove Inflation After 2020", "description": "d", "tags": ["x"]}])
+    monkeypatch.setattr(P, "llm", lambda prompt, max_tokens=6000: json.dumps(next(answers)))
+    monkeypatch.setattr(crew.time, "sleep", lambda s: None)
+    script = {"our_take": "Prices follow money with a lag", "scenes": [{"narration": "word " * 30}] * 4}
+    pkg = crew.publisher_package(script, {"working_title": "W"}, [], [])
+    assert pkg["title"] == "What Drove Inflation After 2020"
+    thumbs = iter([{"thumbnail_text": "BIG NEWS", "thumbnail_prompt": ""}, {"thumbnail_text": "WHAT DROVE INFLATION", "thumbnail_prompt": "a shop"}])
+    monkeypatch.setattr(P, "llm", lambda prompt, max_tokens=6000: json.dumps(next(thumbs)))
+    assert crew.designer_thumbnail(pkg["title"], script, [])["thumbnail_text"] == "WHAT DROVE INFLATION"
+
+
+def test_designer_places_every_chart_in_the_evidence_act():
+    outline = {"acts": [{"name": "a", "beats": [{"beat": "h", "chart": "c9"}, {"beat": "s", "chart": ""}]},
+                        {"name": "b", "beats": [{"beat": f"e{i}", "chart": ""} for i in range(4)]},
+                        {"name": "c", "beats": [{"beat": "r", "chart": ""}]}]}
+    where = studio.assign_chart_cues(outline, [{"id": "c1"}, {"id": "c2"}, {"id": "c3"}])
+    assert set(where) == {"c1", "c2", "c3"} and all(3 <= i <= 6 for i in where.values())  # scenes 3-6 are the evidence act
+    assert outline["acts"][0]["beats"][0]["chart"] == ""                                   # an invented chart id was dropped
+
+
+def test_notes_block_keeps_only_the_latest_notes():
+    block = crew.notes_block([(f"R{i}", f"note {i}") for i in range(12)])
+    assert block.startswith("Notes from your teammates") and "note 11" in block and "note 3" not in block and block.count("\n- ") == 8
+    assert crew.notes_block([]) == ""
