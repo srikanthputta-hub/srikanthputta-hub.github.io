@@ -31,6 +31,13 @@ def json_call(prompt, max_tokens=3500, tries=3):
     raise RuntimeError(f"role call failed after {tries} tries: {err}")
 
 
+def plain(text):
+    """Straight quotes and hyphens, normal spaces: keeps odd glyphs out of titles, callouts and speech."""
+    table = {"\u2010": "-", "\u2011": "-", "\u2012": "-", "\u2013": "-", "\u2014": " - ", "\u2018": "'", "\u2019": "'",
+             "\u201c": '"', "\u201d": '"', "\u00a0": " ", "\u202f": " ", "\u2026": "..."}
+    return " ".join("".join(table.get(ch, ch) for ch in str(text)).split())
+
+
 def normalize_scene(s, charts_ids=()):
     qs = [q for q in (s.get("search_queries") or []) if isinstance(q, str) and q.strip()][:4]
     if not qs and s.get("search_query"):
@@ -38,8 +45,8 @@ def normalize_scene(s, charts_ids=()):
     if not qs:
         qs = ["people walking through a busy city street", "close-up of hands writing in a notebook"]
     chart = s.get("chart") if s.get("chart") in charts_ids else ""
-    return {"narration": " ".join(str(s.get("narration", "")).split()), "search_queries": qs, "search_query": qs[0],
-            "callout": str(s.get("callout") or "").strip()[:40], "chart": chart}
+    return {"narration": plain(s.get("narration", "")), "search_queries": [plain(q) for q in qs], "search_query": plain(qs[0]),
+            "callout": plain(s.get("callout") or "")[:40], "chart": chart}
 
 
 def head_of_content(past_titles, ideas, perf):
@@ -54,13 +61,14 @@ Return ONLY JSON: {{"topic": "...", "working_title": "curiosity-driven, under 70
     for k in ("topic", "working_title", "angle", "our_take"):
         if not str(b.get(k, "")).strip():
             raise RuntimeError(f"Head of Content returned no {k}")
+        b[k] = plain(b[k])
     return b
 
 
-def researcher(brief):
+def researcher(brief, only=None):
     prompt = f"""You are the Researcher. Video: "{brief['working_title']}" - angle: {brief['angle']}.
 Pick 3 or 4 charts from ONLY these datasets (they are real; do not invent others):
-{data.catalog_text()}
+{data.catalog_text(only)}
 Return ONLY JSON: {{"charts": [{{"series": "catalog id", "countries": ["US"], "start_year": 2000, "title": "short chart title", "why": "what this chart shows, under 12 words"}}]}}
 Use countries only for World Bank series. Choose start years that show the story (long enough for 15+ points)."""
     plan = json_call(prompt, 1200)
@@ -115,12 +123,12 @@ Return ONLY JSON: {{"scenes": [{{"narration": "...", "search_queries": ["...", "
                 break
         if not got:
             raise RuntimeError(f"Scriptwriter returned no scenes for act {a_i + 1}")
-        chapters.append({"title": act["name"], "scene": len(scenes)})
+        chapters.append({"title": plain(act["name"]), "scene": len(scenes)})
         scenes += [normalize_scene(s, ids) for s in got[:len(act["beats"])]]
         prev = " ".join(scenes[-1]["narration"].split()[-30:])
-    return {"title": str(outline["title"])[:95], "description": outline["description"], "tags": outline.get("tags", [])[:12],
-            "thumbnail_text": outline.get("thumbnail_text") or brief["working_title"][:24],
-            "thumbnail_prompt": outline.get("thumbnail_prompt", ""), "our_take": outline.get("our_take") or brief["our_take"],
+    return {"title": plain(outline["title"])[:95], "description": plain(outline["description"]), "tags": [plain(t) for t in outline.get("tags", [])[:12]],
+            "thumbnail_text": plain(outline.get("thumbnail_text") or brief["working_title"][:24]),
+            "thumbnail_prompt": plain(outline.get("thumbnail_prompt", "")), "our_take": plain(outline.get("our_take") or brief["our_take"]),
             "scenes": scenes, "chapters": chapters}
 
 

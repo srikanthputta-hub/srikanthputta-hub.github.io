@@ -5,6 +5,7 @@ fact sheet that the script, the fact-checker and the number audit are all held t
 """
 import csv
 import io
+import time
 
 import requests
 
@@ -34,23 +35,35 @@ CATALOG = {
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
-def catalog_text():
+def catalog_text(only=None):
     fred = [f"- {k}: {v['title']} ({v['unit']}), monthly/quarterly, from about 1950" for k, v in CATALOG.items() if v["source"] == "fred"]
     wb = [f"- {k}: {v['title']} ({v['unit']}), annual, any country below" for k, v in CATALOG.items() if v["source"] == "wb"]
     codes = ", ".join(f"{c}={n}" for c, n in COUNTRIES.items())
-    return "US series:\n" + "\n".join(fred) + "\nWorld Bank series (choose 1-4 country codes):\n" + "\n".join(wb) + f"\nCountry codes: {codes}"
+    wb_part = "World Bank series (choose 1-4 country codes):\n" + "\n".join(wb) + f"\nCountry codes: {codes}"
+    return wb_part if only == "wb" else "US series:\n" + "\n".join(fred) + "\n" + wb_part
+
+
+def _get(url, params, tries=4):
+    """FRED in particular can be slow from cloud runners: generous timeout, backoff, several attempts."""
+    err = None
+    for attempt in range(tries):
+        try:
+            r = requests.get(url, params=params, timeout=(10, 75), headers={"User-Agent": "money-blueprint-studio/1.0"})
+            r.raise_for_status()
+            return r
+        except requests.RequestException as e:
+            err = e
+            if attempt < tries - 1:
+                time.sleep(3 * (attempt + 1))
+    raise err
 
 
 def fetch_text(url, params=None):
-    r = requests.get(url, params=params, timeout=45, headers={"User-Agent": "money-blueprint-studio/1.0"})
-    r.raise_for_status()
-    return r.text
+    return _get(url, params).text
 
 
 def fetch_json(url, params=None):
-    r = requests.get(url, params=params, timeout=45, headers={"User-Agent": "money-blueprint-studio/1.0"})
-    r.raise_for_status()
-    return r.json()
+    return _get(url, params).json()
 
 
 def parse_fred(text, spec):
@@ -93,7 +106,7 @@ def load_chart(spec, cid):
     start = int(spec.get("start_year") or (2010 if fred else 2000))
     lines = []
     if fred:
-        pts = parse_fred(fetch_text(FRED_CSV, {"id": s["id"]}), s)
+        pts = parse_fred(fetch_text(FRED_CSV, {"id": s["id"], "cosd": f"{start - 1}-01-01"}), s)
         lines.append({"label": s["title"], "points": [p for p in pts if p[0] >= start]})
     else:
         for c in [c for c in (spec.get("countries") or ["US"]) if c in COUNTRIES][:4] or ["US"]:

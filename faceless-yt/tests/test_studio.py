@@ -242,3 +242,51 @@ def test_claude_md_states_the_hard_rules():
     text = (REPO / "CLAUDE.md").read_text()
     for needle in ("personal financial advice", "No role runs `git commit`", "secret values", "weakens a gate"):
         assert needle.lower() in text.lower(), needle
+
+
+def test_fetch_retries_then_succeeds(monkeypatch):
+    import requests
+    calls = {"n": 0}
+    class R:
+        text = "ok"
+        def raise_for_status(self): pass
+        def json(self): return {"a": 1}
+    def get(url, params=None, timeout=None, headers=None):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise requests.ReadTimeout("slow")
+        return R()
+    monkeypatch.setattr(data.requests, "get", get)
+    monkeypatch.setattr(data.time, "sleep", lambda s: None)
+    assert data.fetch_text("u") == "ok" and calls["n"] == 3
+
+
+def test_fetch_gives_up_after_four_tries(monkeypatch):
+    import requests
+    monkeypatch.setattr(data.requests, "get", lambda *a, **k: (_ for _ in ()).throw(requests.ReadTimeout("slow")))
+    monkeypatch.setattr(data.time, "sleep", lambda s: None)
+    with pytest.raises(requests.ReadTimeout):
+        data.fetch_json("u")
+
+
+def test_plain_text_normalisation_and_wb_only_catalog():
+    assert crew.plain("Data\u2011Driven \u201cstory\u201d \u2014 now\u00a0here") == 'Data-Driven "story" - now here'
+    wb_only = data.catalog_text("wb")
+    assert "wb_inflation" in wb_only and "us_inflation" not in wb_only
+
+
+def test_studio_falls_back_to_world_bank_when_fred_is_down(studio_env, monkeypatch):
+    import requests
+    def fetch_text(url, params=None):
+        raise requests.ReadTimeout("FRED unreachable")
+    monkeypatch.setattr(data, "fetch_text", fetch_text)
+    base = fake_model()
+    def model(prompt, max_tokens=6000):
+        if "You are the Researcher" in prompt and "US series" not in prompt:  # World Bank-only re-plan
+            return json.dumps({"charts": [{"series": "wb_inflation", "countries": ["US"], "start_year": 2000, "title": "Inflation"},
+                                          {"series": "wb_gdp_growth", "countries": ["US", "DE"], "start_year": 2000, "title": "Growth"}]})
+        return base(prompt, max_tokens)
+    monkeypatch.setattr(P, "llm", model)
+    assert studio.run_studio(dry_run=True) == 0
+    run = json.loads((studio_env / "studio" / "state.json").read_text())["runs"][-1]
+    assert run["status"] == "dry-run" and any(s["note"].startswith("only") for s in run["stages"] if s["role"] == "researcher")

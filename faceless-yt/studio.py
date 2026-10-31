@@ -108,11 +108,20 @@ def _run(log, dry_run, cfg):
     log.stage("researcher", "done", f"{len(plan['charts'])} chart(s) planned")
 
     charts, notes = [], []
-    for spec in plan["charts"][:4]:
-        try:
-            charts.append(data.load_chart(spec, f"c{len(charts) + 1}"))
-        except Exception as e:
-            notes.append(f"{spec.get('series')}: {str(e)[:80]}")
+
+    def collect(specs):
+        for spec in specs:
+            if len(charts) >= 4:
+                break
+            try:
+                charts.append(data.load_chart(spec, f"c{len(charts) + 1}"))
+            except Exception as e:
+                notes.append(f"{spec.get('series')}: {str(e)[:80]}")
+
+    collect(plan["charts"][:4])
+    if len(charts) < 2:  # FRED can be unreachable from cloud runners: ask for World Bank-only charts instead
+        log.stage("researcher", "done", f"only {len(charts)} chart(s) loaded; re-planning with World Bank data")
+        collect(crew.researcher(brief, only="wb")["charts"][:4])
     ok = len(charts) >= 2
     log.gate("real_data", ok, f"{len(charts)} chart(s) from real data" + (f"; skipped {notes}" if notes else ""))
     log.stage("data_analyst", "done" if ok else "blocked", ", ".join(c["title"] for c in charts) or "no data")
