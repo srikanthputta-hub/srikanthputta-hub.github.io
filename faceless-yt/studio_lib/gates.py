@@ -60,6 +60,20 @@ def directive_issues(script):
     return issues
 
 
+def scrub_unsupported(script, allowed):
+    """Last resort after the rewrite rounds: drop sentences that still carry an un-sourced figure or advice phrase.
+    Only ever deletes; never writes new content. A scene keeps at least 25 words or is left alone for the gate to catch."""
+    changed = 0
+    for sc in script["scenes"]:
+        sents = re.split(r"(?<=[.!?])\s+", sc["narration"])
+        keep = [s for s in sents
+                if all(number_ok(v, allowed) for _, v in audited_numbers(s)) and not any(rx.search(s) for rx in _DIRECTIVE)]
+        if keep and len(keep) < len(sents) and len(" ".join(keep).split()) >= 25:
+            sc["narration"] = " ".join(keep)
+            changed += 1
+    return changed
+
+
 def word_count(script):
     return sum(len(sc["narration"].split()) for sc in script["scenes"])
 

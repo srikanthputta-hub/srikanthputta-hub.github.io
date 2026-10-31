@@ -175,7 +175,7 @@ Return ONLY JSON: {{"verdict": "pass" or "revise", "issues": [{{"scene": 3, "pro
     return _issues(json_call(prompt, 2500), "policy")
 
 
-def fix_scenes(script, issues, sheet):
+def fix_scenes(script, issues, sheet, allowed=None):
     """Apply reviewer fixes directly; ask the Scriptwriter to rewrite scenes whose issues came without a fix."""
     by_scene = {}
     for it in issues:
@@ -189,11 +189,13 @@ def fix_scenes(script, issues, sheet):
         else:
             need[n] = [i["problem"] for i in its]
     if need:
+        figures = ("Figures you may quote, and nothing else: " + ", ".join(f"{a:,.1f}" for a in (allowed or [])[:60]) + "\n") if allowed else ""
         flagged = "\n".join(f"{n}. PROBLEMS: {' | '.join(p)}\n   CURRENT: {script['scenes'][n - 1]['narration']}" for n, p in need.items())
         prompt = f"""You are the Scriptwriter revising flagged scenes. {POSITIONING}
 FACT SHEET (only numbers you may quote):
 {sheet}
-Rewrite each flagged scene to remove its problems. Keep 3-4 sentences, calm and plain, explanatory, no advice.
+Rewrite each flagged scene to remove its problems. Keep 4 sentences (60 to 80 words), calm and plain, explanatory, no advice.
+{figures}If a scene contains any other figure, delete the figure and say it in words instead (for example "a small share").
 {flagged}
 Return ONLY JSON: {{"fixes": [{{"scene": 3, "narration": "..."}}]}}"""
         res = json_call(prompt, 3500)

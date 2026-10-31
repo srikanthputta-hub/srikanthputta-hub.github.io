@@ -149,8 +149,12 @@ def _run(log, dry_run, cfg):
     if problems:
         return block(log, "script too thin: " + "; ".join(problems))
 
-    clean = False
+    issues = []
     for rnd in range(3):
+        if rnd == 2:  # the rewrites had two goes; now delete whatever sentence still carries an unsupported figure or advice phrase
+            n = gates.scrub_unsupported(script, allowed)
+            if n:
+                print(f"scrubbed unsupported sentences from {n} scene(s)")
         issues = gates.number_issues(script, allowed) + gates.directive_issues(script)
         log.begin("fact_checker", f"review round {rnd + 1}: checking every figure and claim", 5)
         log.begin("policy_editor", f"review round {rnd + 1}: advice, persona and hype check", 6)
@@ -159,16 +163,22 @@ def _run(log, dry_run, cfg):
         log.stage("policy_editor", "done", f"round {rnd + 1}: {len(pe)} issue(s), {len(issues)} automatic flag(s)")
         issues += fc + pe
         if not issues:
-            clean = True
             break
         if rnd < 2:
-            script = crew.fix_scenes(script, issues, sheet)
-    log.gate("numbers_and_facts", clean, "all figures trace to the fact sheet and reviewers found nothing" if clean else f"{len(issues)} unresolved issue(s): " + "; ".join(i["problem"][:70] for i in issues[:3]))
-    log.gate("policy", clean, "no advice, expert persona or hype" if clean else "unresolved policy issues")
-    if not clean:
+            script = crew.fix_scenes(script, issues, sheet, allowed)
+    bad_facts = [i for i in issues if i["type"] in ("number", "fact")]
+    bad_policy = [i for i in issues if i["type"] == "policy"]
+    log.gate("numbers_and_facts", not bad_facts, "all figures trace to the fact sheet and reviewers found nothing" if not bad_facts
+             else f"{len(bad_facts)} unresolved: " + "; ".join(i["problem"][:70] for i in bad_facts[:3]))
+    log.gate("policy", not bad_policy, "no advice, expert persona or hype" if not bad_policy
+             else f"{len(bad_policy)} unresolved: " + "; ".join(i["problem"][:70] for i in bad_policy[:3]))
+    if bad_facts or bad_policy:
         return block(log, "script did not pass fact-check and policy review after 2 revisions")
+    problems = gates.structure_issues(script, cfg)  # the review may have trimmed sentences: re-check the length
+    log.gate("structure_after_review", not problems, "; ".join(problems) or f"{gates.word_count(script)} words after review")
+    if problems:
+        return block(log, "script too thin after review: " + "; ".join(problems))
 
-    log.begin("originality_editor", "comparing with published scripts", 7)
     problems = gates.originality_issues(script, load_library())
     log.gate("originality", not problems, "; ".join(problems) or "distinct from published scripts and has its own point of view")
     log.stage("originality_editor", "done" if not problems else "blocked", "; ".join(problems) or "ok")

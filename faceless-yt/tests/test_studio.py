@@ -314,17 +314,18 @@ def test_board_updates_and_never_raises(monkeypatch):
     assert calls[3][1]["status"] == "blocked"
 
 
-def test_board_gives_up_quietly_after_three_failures(monkeypatch):
+def test_board_gives_up_quietly_after_four_failed_calls(monkeypatch):
     import requests
+    monkeypatch.setattr(office.time, "sleep", lambda s: None)
     n = {"c": 0}
     def boom(*a, **k):
         n["c"] += 1
         raise requests.ConnectionError("blocked")
     monkeypatch.setattr(office.requests, "patch", boom)
     b = office.Board("v", 14, enabled=True)
-    for _ in range(6):
+    for _ in range(7):
         b.start("researcher", "x")
-    assert n["c"] == 3 and b.enabled is False
+    assert n["c"] == 8 and b.enabled is False  # 4 failed calls, each tried twice
 
 
 def test_board_can_be_switched_off_by_env(monkeypatch):
@@ -417,3 +418,39 @@ def test_dashboard_desks_match_the_role_registry():
     on_board = set(order + extra + ["boss"])
     assert on_board == {r["id"] for r in ROLES}, on_board ^ {r["id"] for r in ROLES}
     assert len(order + extra) == 16  # the ring has exactly 16 desk slots; the boss has its own
+
+
+def test_board_retries_a_timed_out_update_once(monkeypatch):
+    monkeypatch.setattr(office.time, "sleep", lambda s: None)
+    seen = []
+    class Slow(FakeResp):
+        status_code = 500
+        text = "statement timeout"
+    monkeypatch.setattr(office.requests, "patch", lambda *a, **k: seen.append(1) or (Slow() if len(seen) == 1 else FakeResp()))
+    b = office.Board("v", 14, enabled=True)
+    assert b.start("researcher", "x") is None and len(seen) == 2 and b.fails == 0 and b.enabled
+
+
+def test_scrub_deletes_only_unsupported_sentences():
+    allowed = [9.06]
+    keep = "Prices rose about 9 percent in 2022 and people noticed it in shops and restaurants everywhere they went. "
+    bad = "Then they climbed another 2.6 % afterwards. You should buy stocks now. "
+    tail = "Economists link the pattern to supply problems and to strong demand after the lockdowns ended."
+    script = {"scenes": [{"narration": keep + bad + tail}, {"narration": "Short scene with 5.5 % in it."}]}
+    assert gates.scrub_unsupported(script, allowed) == 1
+    out = script["scenes"][0]["narration"]
+    assert "2.6" not in out and "You should" not in out and out.startswith("Prices rose about 9 percent") and out.endswith("ended.")
+    assert script["scenes"][1]["narration"] == "Short scene with 5.5 % in it."  # too short to trim: left for the gate to catch
+
+
+def test_numbers_and_policy_gates_are_judged_separately(studio_env, monkeypatch):
+    base = fake_model()
+    def model(prompt, max_tokens=6000):
+        if "Policy Editor" in prompt:
+            return json.dumps({"verdict": "revise", "issues": [{"scene": 1, "problem": "reads like advice", "fix": ""}]})
+        return base(prompt, max_tokens)
+    monkeypatch.setattr(P, "llm", model)
+    monkeypatch.setattr(crew, "fix_scenes", lambda script, issues, sheet, allowed=None: script)
+    assert studio.run_studio(dry_run=True) == 0
+    gates_by_name = {g["name"]: g for g in json.loads((studio_env / "studio" / "state.json").read_text())["runs"][-1]["gates"]}
+    assert gates_by_name["numbers_and_facts"]["passed"] is True and gates_by_name["policy"]["passed"] is False

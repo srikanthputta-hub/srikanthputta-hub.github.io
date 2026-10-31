@@ -5,6 +5,7 @@ status columns (row-level security + column grants enforce that). Strictly best-
 stop a video, so every call swallows errors and gives up quietly after a few consecutive failures.
 """
 import os
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -21,22 +22,27 @@ class Board:
         self.active = {}
         self.headers = {"apikey": KEY, "Authorization": f"Bearer {KEY}", "Content-Type": "application/json", "Prefer": "return=minimal"}
 
-    def _patch(self, query, body):
+    def _patch(self, query, body, tries=2):
         if not self.enabled:
             return False
-        try:
-            r = requests.patch(f"{URL}?{query}", json=body, headers=self.headers, timeout=6)
-            if r.status_code >= 300:
-                raise RuntimeError(f"{r.status_code} {r.text[:120]}")
-            self.fails = 0
-            return True
-        except Exception as e:
-            self.fails += 1
-            print(f"[office] board update skipped: {str(e)[:120]}")
-            if self.fails >= 3:
-                self.enabled = False
-                print("[office] board disabled for the rest of this run")
-            return False
+        err = None
+        for attempt in range(tries):
+            try:
+                r = requests.patch(f"{URL}?{query}", json=body, headers=self.headers, timeout=6)
+                if r.status_code >= 300:
+                    raise RuntimeError(f"{r.status_code} {r.text[:120]}")
+                self.fails = 0
+                return True
+            except Exception as e:
+                err = e
+                if attempt < tries - 1:
+                    time.sleep(1.5)
+        self.fails += 1
+        print(f"[office] board update skipped: {str(err)[:120]}")
+        if self.fails >= 4:
+            self.enabled = False
+            print("[office] board disabled for the rest of this run")
+        return False
 
     def reset(self):
         """Start of a run: everyone idle, no pipeline, no leftover text."""
