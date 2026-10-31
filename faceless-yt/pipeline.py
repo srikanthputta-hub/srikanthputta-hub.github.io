@@ -15,18 +15,48 @@ CFG = json.loads((HERE / "config.json").read_text())
 OUT = HERE / "output"
 HISTORY = HERE / "history.json"
 MODEL = "claude-sonnet-5-5"
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")  # free tier; override if Google retires it
+_GEMINI_API = "https://generativelanguage.googleapis.com/v1beta"
+_gemini_cache = {}
+
+
+def pick_gemini_model(models):
+    """Newest plain 'gemini-X-flash' that supports generateContent; else any other text flash model."""
+    ok = [m["name"].split("/")[-1] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
+    def version(n):
+        m = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash", n)
+        return float(m.group(1)) if m else None
+    plain = sorted((n for n in ok if version(n) is not None), key=version, reverse=True)
+    if plain:
+        return plain[0]
+    skip = ("image", "tts", "live", "audio", "embedding", "lite", "thinking", "robotics", "computer")
+    flash = sorted(n for n in ok if "flash" in n and not any(s in n for s in skip))
+    if flash:
+        return flash[-1]
+    raise RuntimeError(f"No usable Gemini flash model in this account's list: {ok[:15]}")
+
+
+def gemini_model(key):
+    if os.environ.get("GEMINI_MODEL"):  # explicit override wins
+        return os.environ["GEMINI_MODEL"]
+    if "m" not in _gemini_cache:
+        r = requests.get(f"{_GEMINI_API}/models", headers={"x-goog-api-key": key}, params={"pageSize": 200}, timeout=30)
+        r.raise_for_status()
+        _gemini_cache["m"] = pick_gemini_model(r.json().get("models", []))
+        print("Gemini model:", _gemini_cache["m"])
+    return _gemini_cache["m"]
 
 
 def llm(prompt, max_tokens=6000):
     """Free path: Gemini (GEMINI_API_KEY). Paid path: Claude (ANTHROPIC_API_KEY). Gemini wins if both are set."""
-    if os.environ.get("GEMINI_API_KEY"):
+    key = os.environ.get("GEMINI_API_KEY")
+    if key:
         r = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
-            headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"]}, timeout=180,
+            f"{_GEMINI_API}/models/{gemini_model(key)}:generateContent",
+            headers={"x-goog-api-key": key}, timeout=180,
             json={"contents": [{"parts": [{"text": prompt}]}],
                   "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}})
-        r.raise_for_status()
+        if not r.ok:
+            raise ValueError(f"Gemini {r.status_code}: {r.text[:300]}")
         return r.json()["candidates"][0]["content"]["parts"][0]["text"]
     if os.environ.get("ANTHROPIC_API_KEY"):
         import anthropic

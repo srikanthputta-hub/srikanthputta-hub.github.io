@@ -65,15 +65,35 @@ def test_missing_key_fails_fast(monkeypatch):
         P.ask_json("x")
 
 
+def test_gemini_model_autodiscovery():
+    models = [{"name": "models/gemini-2.5-flash", "supportedGenerationMethods": ["generateContent"]},
+              {"name": "models/gemini-3-flash", "supportedGenerationMethods": ["generateContent"]},
+              {"name": "models/gemini-3-flash-image", "supportedGenerationMethods": ["generateContent"]},
+              {"name": "models/gemini-4-flash", "supportedGenerationMethods": ["embedContent"]},
+              {"name": "models/gemini-3-pro", "supportedGenerationMethods": ["generateContent"]}]
+    assert P.pick_gemini_model(models) == "gemini-3-flash"
+    only_variants = [{"name": "models/gemini-9-flash-preview", "supportedGenerationMethods": ["generateContent"]}]
+    assert P.pick_gemini_model(only_variants) == "gemini-9-flash-preview"
+    with pytest.raises(RuntimeError):
+        P.pick_gemini_model([{"name": "models/gemini-3-pro", "supportedGenerationMethods": ["generateContent"]}])
+
+
 def test_gemini_request_shape(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    P._gemini_cache.clear()
     seen = {}
     class R:
+        ok = True
+        def __init__(self, d): self._d = d
         def raise_for_status(self): pass
-        def json(self): return {"candidates": [{"content": {"parts": [{"text": "hi"}]}}]}
-    def post(url, **kw): seen.update(url=url, **kw); return R()
+        def json(self): return self._d
+    def get(url, **kw): return R({"models": [{"name": "models/gemini-3-flash", "supportedGenerationMethods": ["generateContent"]}]})
+    def post(url, **kw): seen.update(url=url, **kw); return R({"candidates": [{"content": {"parts": [{"text": "hi"}]}}]})
+    monkeypatch.setattr(P.requests, "get", get)
     monkeypatch.setattr(P.requests, "post", post)
-    assert P.llm("p") == "hi" and "generateContent" in seen["url"] and seen["headers"]["x-goog-api-key"] == "k"
+    assert P.llm("p") == "hi"
+    assert "gemini-3-flash:generateContent" in seen["url"] and seen["headers"]["x-goog-api-key"] == "k"
 
 
 def test_footage_falls_back_from_pexels_to_pixabay(tmp_path, monkeypatch):
