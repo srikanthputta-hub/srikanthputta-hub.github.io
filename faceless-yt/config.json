@@ -1,13 +1,16 @@
 {
-  "niche": "personal finance for beginners: saving, investing basics, debt payoff, credit scores, taxes, money psychology",
-  "tone": "clear, trustworthy, conversational explainer; concrete numbers and examples; no hype, no get-rich-quick claims",
+  "niche": "how money and the economy work, explained with real public data (inflation, interest rates, money supply, debt, jobs, housing); educational explainers, never personal financial advice",
+  "tone": "calm, curious, clear storytelling in plain language; precise numbers taken only from the supplied data; no hype, no instructions to the viewer about their money",
   "format": "long",
-  "scenes": 14,
+  "scenes": 18,
   "voice": "en-US-AndrewNeural",
   "privacy": "public",
   "category_id": "27",
   "affiliate_links": [],
   "channel": "The Money Blueprint (@MoneyBlueprintWithSri)",
-  "audience": "global English-speaking viewers; use USD for examples; teach principles that work in any country (compound interest, budgeting, debt payoff, diversification, inflation); do not rely on country-specific tax rules or account types (401k, ISA, PPF...) unless the title says which country; if one is mentioned, say it varies by country",
-  "ai_thumbnails": true
+  "audience": "English-speaking viewers mainly in the US, UK, Canada and Australia; USD unless a chart is about another country; explain jargon the first time it appears",
+  "ai_thumbnails": true,
+  "min_minutes": 6,
+  "min_words": 1000,
+  "cadence": "Mon/Wed/Fri"
 }

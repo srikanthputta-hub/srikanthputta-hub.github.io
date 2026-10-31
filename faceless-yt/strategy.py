@@ -38,7 +38,7 @@ def ideas():
         if len(have) >= 100:
             break
         raw = ask(f"""Act as a YouTube market researcher. {ctx()}
-Generate 40 NEW video ideas people actively search for or click (how/why, X vs Y, mistakes, step-by-step, myths, calculators-in-words).
+Generate 40 NEW explainer ideas people actively search for or click: 'why did X happen', 'how does X work', 'what actually happened to X', 'X vs Y explained', myths about the economy. Each must be answerable with public economic data. No personal-finance advice or how-to-get-rich ideas.
 Avoid duplicates of: {sorted(seen)[-60:]}
 Return ONLY a JSON array: [{{"title": "...", "angle": "one line on the hook and value", "score": 1-10 for search demand x click appeal x low competition}}]""")
         for i in json.loads(raw[raw.index("["): raw.rindex("]") + 1]):

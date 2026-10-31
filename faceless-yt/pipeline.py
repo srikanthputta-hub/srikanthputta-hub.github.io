@@ -89,9 +89,18 @@ def _groq(prompt, max_tokens, key):
             raise ValueError(f"Groq {r.status_code}: {r.text[:300]}")
         model = pick_groq_model(r.json()["data"])
         print("Groq model:", model)
-    r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, timeout=180,
-                      json={"model": model, "max_tokens": min(max_tokens, 8000), "temperature": 0.8,
-                            "messages": [{"role": "user", "content": prompt}]})
+    est_prompt = len(prompt) // 3 + 60
+    budget = 7800 - est_prompt  # free tier: ~8k tokens/min per request, requested output included
+    if budget < 800:
+        raise ValueError(f"Groq 413 retry-after=: prompt too large for the free tier (~{est_prompt} tokens)")
+    payload = {"model": model, "max_tokens": min(max_tokens, budget, 8000), "temperature": 0.8,
+               "messages": [{"role": "user", "content": prompt}]}
+    if "gpt-oss" in model:
+        payload["reasoning_effort"] = "low"  # fewer hidden reasoning tokens eating the output budget
+    r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, timeout=180, json=payload)
+    if r.status_code == 400 and "reasoning" in r.text.lower() and "reasoning_effort" in payload:
+        del payload["reasoning_effort"]
+        r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, timeout=180, json=payload)
     if not r.ok:
         raise ValueError(f"Groq {r.status_code} retry-after={r.headers.get('retry-after', '')}: {r.text[:600]}")
     return r.json()["choices"][0]["message"]["content"]
@@ -133,13 +142,13 @@ def llm(prompt, max_tokens=6000):
     for name, fn, key in providers:
         if name in _dead_providers:
             continue
-        for attempt in range(4):
+        for attempt in range(7):
             try:
                 return fn(prompt, max_tokens, key)
             except Exception as e:
                 msg = str(e)
                 wait = rate_limit_wait(msg)
-                if wait is not None and attempt < 3:
+                if wait is not None and attempt < 6:
                     print(f"{name} rate limited; waiting {wait:.0f}s then retrying")
                     time.sleep(wait)
                     continue
@@ -426,17 +435,29 @@ def find_font():
 
 
 def build_scene_clip(sc, i, d, work):
-    """One scene = several short cuts (~5s) from different searches, optional animated on-screen callout."""
+    """One scene = optional animated chart, then short b-roll cuts (~5s) from different searches, optional callout."""
     queries = sc.get("search_queries") or [sc["search_query"]]
     seg = 5.0 if CFG["format"] == "long" else 3.5
-    n = max(1, round(d / seg))
     parts, left = [], d
-    for k in range(n):
-        length = left / (n - k)
-        left -= length
-        part = work / f"v{i}_{k}.mp4"
-        fetch_clip(queries[k % len(queries)], part, length)
-        parts.append(part)
+    chart = sc.get("chart_video")
+    if chart and Path(chart).exists():
+        cdur = duration(chart)
+        clen = min(d, cdur + 3.0)
+        if d - clen < 2.0:
+            clen = d
+        cpart = work / f"v{i}_c.mp4"
+        sh("ffmpeg", "-y", "-i", chart, "-t", clen, "-vf", f"tpad=stop_mode=clone:stop_duration={max(0.0, clen - cdur):.2f}",
+           "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", cpart)
+        parts.append(cpart)
+        left = d - clen
+    if left >= 0.5 or not parts:
+        n = max(1, round(left / seg))
+        for k in range(n):
+            length = left / (n - k)
+            left -= length
+            part = work / f"v{i}_{k}.mp4"
+            fetch_clip(queries[k % len(queries)], part, length)
+            parts.append(part)
     listing = work / f"p{i}.txt"
     listing.write_text("".join(f"file '{q.resolve()}'\n" for q in parts))
     scene = work / f"v{i}.mp4"
@@ -451,7 +472,7 @@ def build_scene_clip(sc, i, d, work):
     fs = SIZE[1] // (22 if CFG["format"] == "short" else 13)
     font = f"fontfile={find_font()}:" if find_font() else ""
     dt = (f"drawtext={font}textfile={tf}:fontsize={fs}:fontcolor=0xF5B82E:box=1:boxcolor=0x0B1F3A@0.80:boxborderw={fs // 3}:"
-          f"x=(w-text_w)/2:y=h*0.13:alpha='if(lt(t,0.3),t/0.3,if(lt(t,{show - 0.5:.2f}),1,max(0,({show:.2f}-t)/0.5)))'")
+          f"x={'w-text_w-w*0.05' if chart else '(w-text_w)/2'}:y=h*{0.07 if chart else 0.13}:alpha='if(lt(t,0.3),t/0.3,if(lt(t,{show - 0.5:.2f}),1,max(0,({show:.2f}-t)/0.5)))'")
     sh(*base, "-vf", dt, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", scene)
     return scene
 
@@ -490,13 +511,14 @@ def render(script):
         print(f"scene {i + 1}: {d:.1f}s  {sc['search_queries']}" + (f"  callout: {sc['callout']}" if sc.get("callout") else ""))
     (work / "v.txt").write_text("".join(f"file '{c.resolve()}'\n" for c in clips))
     (work / "a.txt").write_text("".join(f"file '{a.resolve()}'\n" for a in audios))
+    (work / "durs.json").write_text(json.dumps(durs))
     srt = work / "captions.srt"
     srt.write_text(build_srt(timings, durs))
     final = OUT / "video.mp4"
-    size = 14 if CFG["format"] == "short" else 12
-    style = (f"FontName=Montserrat,Bold=1,FontSize={size * 2},PrimaryColour=&H00FFFFFF,"
-             f"OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=" +
-             ("260" if CFG["format"] == "short" else "60"))
+    # long-form: modest captions in a reserved bottom band (charts leave it free); shorts: larger, mid-lower third
+    fsize, margin = (28, 260) if CFG["format"] == "short" else (16, 18)
+    style = (f"FontName=Montserrat,Bold=1,FontSize={fsize},PrimaryColour=&H00FFFFFF,"
+             f"OutlineColour=&H00000000,BorderStyle=1,Outline=2,Alignment=2,MarginV={margin}")
     tracks = sorted((HERE / "music").glob("*.mp3")) if (HERE / "music").exists() else []
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", work / "v.txt",
            "-f", "concat", "-safe", "0", "-i", work / "a.txt"]

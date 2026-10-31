@@ -11,6 +11,9 @@ on:
 permissions:
   contents: write
   issues: write
+concurrency:
+  group: studio
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -31,7 +34,7 @@ jobs:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID || secrets.CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET || secrets.CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-        run: python pipeline.py ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+        run: python studio.py ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -39,14 +42,17 @@ jobs:
           path: |
             faceless-yt/output/video.mp4
             faceless-yt/output/thumbnail.jpg
-      - name: Save topic history
+            faceless-yt/output/report.md
+            faceless-yt/output/script.json
+      - name: Save studio state, history and script library
+        if: always()
         run: |
           git config user.name "yt-bot" && git config user.email "yt-bot@users.noreply.github.com"
-          for f in history.json ideas.json; do
-            if [ -f "faceless-yt/$f" ]; then git add "faceless-yt/$f"; fi
+          for f in studio/state.json faceless-yt/history.json faceless-yt/ideas.json faceless-yt/library; do
+            if [ -e "$f" ]; then git add "$f"; fi
           done
           if ! git diff --cached --quiet; then
-            git commit -m "Update YT history" && git pull --rebase origin main && git push
+            git commit -m "Studio update" && git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"
           fi
       - name: Open an issue if the run failed
         if: failure()
