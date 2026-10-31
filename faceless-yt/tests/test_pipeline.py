@@ -74,3 +74,24 @@ def test_gemini_request_shape(monkeypatch):
     def post(url, **kw): seen.update(url=url, **kw); return R()
     monkeypatch.setattr(P.requests, "post", post)
     assert P.llm("p") == "hi" and "generateContent" in seen["url"] and seen["headers"]["x-goog-api-key"] == "k"
+
+
+def test_footage_falls_back_from_pexels_to_pixabay(tmp_path, monkeypatch):
+    monkeypatch.setenv("PEXELS_API_KEY", "p")
+    monkeypatch.setenv("PIXABAY_API_KEY", "x")
+    src = tmp_path / "src.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=red:s=640x360:d=3", str(src)], check=True)
+    class R:
+        def __init__(self, data=None, content=b""): self._d, self.content = data, content
+        def raise_for_status(self): pass
+        def json(self): return self._d
+    def get(url, **kw):
+        if "pexels" in url: raise RuntimeError("keys paused")
+        if "pixabay.com/api" in url:
+            return R({"hits": [{"id": 7, "duration": 5, "videos": {"large": {"url": "http://v/clip.mp4"}}}]})
+        return R(content=src.read_bytes())
+    monkeypatch.setattr(P.requests, "get", get)
+    P.USED_CLIPS.clear()
+    out = tmp_path / "v.mp4"
+    P.fetch_clip("money", out, 2)
+    assert out.exists() and ("pixabay", 7) in P.USED_CLIPS

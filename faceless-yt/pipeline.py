@@ -196,25 +196,53 @@ async def _tts(text, path):
 USED_CLIPS = set()
 
 
+def _search_pexels(query):
+    r = requests.get("https://api.pexels.com/videos/search", headers={"Authorization": os.environ["PEXELS_API_KEY"]},
+                     params={"query": query, "orientation": "portrait" if CFG["format"] == "short" else "landscape",
+                             "per_page": 15}, timeout=30)
+    r.raise_for_status()
+    out = []
+    for v in r.json().get("videos", []):
+        if v["duration"] >= 3:
+            best = min(v["video_files"], key=lambda f: abs(f["width"] - SIZE[0]))
+            out.append(("pexels", v["id"], best["link"]))
+    return out
+
+
+def _search_pixabay(query):
+    r = requests.get("https://pixabay.com/api/videos/", timeout=30,
+                     params={"key": os.environ["PIXABAY_API_KEY"], "q": query, "per_page": 20, "safesearch": "true"})
+    r.raise_for_status()
+    out = []
+    for h in r.json().get("hits", []):
+        if h.get("duration", 0) >= 3:
+            vid = h["videos"].get("large") or h["videos"].get("medium")
+            if vid and vid.get("url"):
+                out.append(("pixabay", h["id"], vid["url"]))
+    return out
+
+
 def fetch_clip(query, dest, seconds):
-    key = os.environ.get("PEXELS_API_KEY")
-    if key:
-        orient = "portrait" if CFG["format"] == "short" else "landscape"
-        r = requests.get("https://api.pexels.com/videos/search", headers={"Authorization": key},
-                         params={"query": query, "orientation": orient, "per_page": 15}, timeout=30)
-        vids = [v for v in r.json().get("videos", []) if v["duration"] >= 3 and v["id"] not in USED_CLIPS]
-        if vids:
-            v = random.choice(vids[:8])
-            USED_CLIPS.add(v["id"])
-            files = sorted(v["video_files"], key=lambda f: abs(f["width"] - SIZE[0]))
-            data = requests.get(files[0]["link"], timeout=120).content
-            raw = dest.with_suffix(".src.mp4")
-            raw.write_bytes(data)
-            sh("ffmpeg", "-y", "-stream_loop", "-1", "-i", raw, "-t", seconds, "-an",
-               "-vf", f"scale={SIZE[0]}:{SIZE[1]}:force_original_aspect_ratio=increase,"
-                      f"crop={SIZE[0]}:{SIZE[1]},fps=30,setsar=1",
-               "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", dest)
-            return
+    """Stock footage from Pexels or Pixabay (whichever key is set); gradient fallback so a run always completes."""
+    for env, search in (("PEXELS_API_KEY", _search_pexels), ("PIXABAY_API_KEY", _search_pixabay)):
+        if not os.environ.get(env):
+            continue
+        try:
+            fresh = [c for c in search(query) if c[:2] not in USED_CLIPS]
+        except Exception as e:
+            print(f"{env} search failed ({e}); trying next source")
+            continue
+        if not fresh:
+            continue
+        src, cid, url = random.choice(fresh[:8])
+        USED_CLIPS.add((src, cid))
+        raw = dest.with_suffix(".src.mp4")
+        raw.write_bytes(requests.get(url, timeout=120).content)
+        sh("ffmpeg", "-y", "-stream_loop", "-1", "-i", raw, "-t", seconds, "-an",
+           "-vf", f"scale={SIZE[0]}:{SIZE[1]}:force_original_aspect_ratio=increase,"
+                  f"crop={SIZE[0]}:{SIZE[1]},fps=30,setsar=1",
+           "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", dest)
+        return
     # fallback: animated gradient so the pipeline always completes
     sh("ffmpeg", "-y", "-f", "lavfi", "-i",
        f"gradients=s={SIZE[0]}x{SIZE[1]}:d={seconds}:speed=0.02:r=30", "-c:v", "libx264",
