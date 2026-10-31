@@ -115,3 +115,28 @@ def test_footage_falls_back_from_pexels_to_pixabay(tmp_path, monkeypatch):
     out = tmp_path / "v.mp4"
     P.fetch_clip("money", out, 2)
     assert out.exists() and ("pixabay", 7) in P.USED_CLIPS
+
+
+def test_groq_model_pick():
+    models = [{"id": "llama-3.1-8b-instant", "active": True}, {"id": "llama-3.3-70b-versatile", "active": True},
+              {"id": "llama-guard-4-12b", "active": True}, {"id": "whisper-large-v3", "active": True},
+              {"id": "llama-9-400b-old", "active": False}]
+    assert P.pick_groq_model(models) == "llama-3.3-70b-versatile"
+
+
+def test_llm_falls_back_to_groq_when_gemini_out_of_credit(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "g"); monkeypatch.setenv("GROQ_API_KEY", "q")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False); monkeypatch.delenv("GROQ_MODEL", raising=False)
+    monkeypatch.delenv("GEMINI_MODEL", raising=False); P._gemini_cache.clear()
+    class R:
+        def __init__(self, ok, d=None, code=200): self.ok, self._d, self.status_code, self.text = ok, d, code, "credits depleted"
+        def raise_for_status(self): pass
+        def json(self): return self._d
+    def get(url, **kw):
+        if "groq" in url: return R(True, {"data": [{"id": "llama-3.3-70b-versatile"}]})
+        return R(True, {"models": [{"name": "models/gemini-3-flash", "supportedGenerationMethods": ["generateContent"]}]})
+    def post(url, **kw):
+        if "googleapis" in url: return R(False, code=402)
+        return R(True, {"choices": [{"message": {"content": "from groq"}}]})
+    monkeypatch.setattr(P.requests, "get", get); monkeypatch.setattr(P.requests, "post", post)
+    assert P.llm("p") == "from groq"

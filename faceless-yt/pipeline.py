@@ -46,25 +46,72 @@ def gemini_model(key):
     return _gemini_cache["m"]
 
 
-def llm(prompt, max_tokens=6000):
-    """Free path: Gemini (GEMINI_API_KEY). Paid path: Claude (ANTHROPIC_API_KEY). Gemini wins if both are set."""
-    key = os.environ.get("GEMINI_API_KEY")
-    if key:
-        r = requests.post(
-            f"{_GEMINI_API}/models/{gemini_model(key)}:generateContent",
-            headers={"x-goog-api-key": key}, timeout=180,
-            json={"contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}})
-        if not r.ok:
-            raise ValueError(f"Gemini {r.status_code}: {r.text[:300]}")
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        import anthropic
-        m = anthropic.Anthropic().messages.create(model=MODEL, max_tokens=max_tokens,
-                                                  messages=[{"role": "user", "content": prompt}])
-        return m.content[0].text
-    raise RuntimeError("No LLM key found: set GEMINI_API_KEY (free) or ANTHROPIC_API_KEY as a secret")
 SIZE = (1080, 1920) if CFG["format"] == "short" else (1920, 1080)
+
+
+def _gemini(prompt, max_tokens, key):
+    r = requests.post(
+        f"{_GEMINI_API}/models/{gemini_model(key)}:generateContent",
+        headers={"x-goog-api-key": key}, timeout=180,
+        json={"contents": [{"parts": [{"text": prompt}]}],
+              "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}})
+    if not r.ok:
+        raise ValueError(f"Gemini {r.status_code}: {r.text[:300]}")
+    return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+
+
+def pick_groq_model(models):
+    """Largest active Llama chat model; GROQ_MODEL overrides."""
+    cands = []
+    for m in models:
+        mid = m["id"]
+        size = re.search(r"(\d+)b", mid)
+        if m.get("active", True) and "llama" in mid and size and not any(s in mid for s in ("guard", "whisper", "tts")):
+            cands.append((int(size.group(1)), "versatile" in mid, mid))
+    if not cands:
+        raise RuntimeError("No Llama chat model available on this Groq account")
+    return max(cands)[2]
+
+
+def _groq(prompt, max_tokens, key):
+    h = {"Authorization": f"Bearer {key}"}
+    model = os.environ.get("GROQ_MODEL")
+    if not model:
+        r = requests.get("https://api.groq.com/openai/v1/models", headers=h, timeout=30)
+        if not r.ok:
+            raise ValueError(f"Groq {r.status_code}: {r.text[:300]}")
+        model = pick_groq_model(r.json()["data"])
+        print("Groq model:", model)
+    r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, timeout=180,
+                      json={"model": model, "max_tokens": min(max_tokens, 8000), "temperature": 0.8,
+                            "messages": [{"role": "user", "content": prompt}]})
+    if not r.ok:
+        raise ValueError(f"Groq {r.status_code}: {r.text[:300]}")
+    return r.json()["choices"][0]["message"]["content"]
+
+
+def _claude(prompt, max_tokens, key):
+    import anthropic
+    m = anthropic.Anthropic(api_key=key).messages.create(model=MODEL, max_tokens=max_tokens,
+                                                         messages=[{"role": "user", "content": prompt}])
+    return m.content[0].text
+
+
+def llm(prompt, max_tokens=6000):
+    """Tries every provider that has a key, free ones first: Gemini, Groq, then Claude (paid, optional)."""
+    providers = [(n, f, os.environ.get(k)) for n, f, k in
+                 (("Gemini", _gemini, "GEMINI_API_KEY"), ("Groq", _groq, "GROQ_API_KEY"),
+                  ("Claude", _claude, "ANTHROPIC_API_KEY")) if os.environ.get(k)]
+    if not providers:
+        raise RuntimeError("No LLM key found: set GEMINI_API_KEY or GROQ_API_KEY (both free), or ANTHROPIC_API_KEY (paid)")
+    errors = []
+    for name, fn, key in providers:
+        try:
+            return fn(prompt, max_tokens, key)
+        except Exception as e:
+            print(f"{name} failed, trying next provider: {str(e)[:200]}")
+            errors.append(f"{name}: {str(e)[:200]}")
+    raise ValueError("all LLM providers failed: " + " | ".join(errors))
 
 
 def sh(*cmd):
