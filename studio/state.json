@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-31T14:50:24+00:00",
+  "updated": "2026-10-31T15:12:46+00:00",
   "channel": "The Money Blueprint",
   "roles": [
     {
@@ -227,6 +227,113 @@
         }
       ],
       "note": "script too thin: only 862 words (need at least 1000 for a video long enough to carry mid-roll ads)"
+    },
+    {
+      "id": "20261031-151026",
+      "started": "2026-10-31T15:10:26+00:00",
+      "finished": "2026-10-31T15:12:46+00:00",
+      "mode": "dry-run",
+      "status": "blocked",
+      "title": null,
+      "topic": "The 2021-2022 Inflation Surge: What the Data Really Shows",
+      "video_id": null,
+      "gates": [
+        {
+          "name": "real_data",
+          "passed": true,
+          "detail": "4 chart(s) from real data"
+        },
+        {
+          "name": "structure",
+          "passed": true,
+          "detail": "15 scenes, 1030 words"
+        },
+        {
+          "name": "numbers_and_facts",
+          "passed": false,
+          "detail": "1 unresolved issue(s): figure(s) not in the fact sheet: 2.6 %. Quote only fact-sheet numbers "
+        },
+        {
+          "name": "policy",
+          "passed": false,
+          "detail": "unresolved policy issues"
+        }
+      ],
+      "stages": [
+        {
+          "role": "head_of_content",
+          "status": "done",
+          "note": "Why Inflation Jumped in 2021-22 - A Data-Driven Story",
+          "at": "2026-10-31T15:10:29+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "4 chart(s) planned",
+          "at": "2026-10-31T15:10:46+00:00"
+        },
+        {
+          "role": "data_analyst",
+          "status": "done",
+          "note": "US Broad Money (% of GDP), US Consumer Inflation Rate, US Unemployment Rate, US Real GDP Growth",
+          "at": "2026-10-31T15:10:50+00:00"
+        },
+        {
+          "role": "scriptwriter",
+          "status": "done",
+          "note": "15 scenes, 1030 words",
+          "at": "2026-10-31T15:11:04+00:00"
+        },
+        {
+          "role": "fact_checker",
+          "status": "done",
+          "note": "round 1: 1 issue(s)",
+          "at": "2026-10-31T15:11:47+00:00"
+        },
+        {
+          "role": "policy_editor",
+          "status": "done",
+          "note": "round 1: 0 issue(s), 2 automatic flag(s)",
+          "at": "2026-10-31T15:11:50+00:00"
+        },
+        {
+          "role": "fact_checker",
+          "status": "done",
+          "note": "round 2: 1 issue(s)",
+          "at": "2026-10-31T15:12:10+00:00"
+        },
+        {
+          "role": "policy_editor",
+          "status": "done",
+          "note": "round 2: 0 issue(s), 1 automatic flag(s)",
+          "at": "2026-10-31T15:12:13+00:00"
+        },
+        {
+          "role": "fact_checker",
+          "status": "done",
+          "note": "round 3: 0 issue(s)",
+          "at": "2026-10-31T15:12:46+00:00"
+        },
+        {
+          "role": "policy_editor",
+          "status": "done",
+          "note": "round 3: 0 issue(s), 1 automatic flag(s)",
+          "at": "2026-10-31T15:12:46+00:00"
+        },
+        {
+          "role": "producer",
+          "status": "blocked",
+          "note": "script did not pass fact-check and policy review after 2 revisions",
+          "at": "2026-10-31T15:12:46+00:00"
+        },
+        {
+          "role": "ops",
+          "status": "done",
+          "note": "run blocked: script did not pass fact-check and policy review after 2 revisions",
+          "at": "2026-10-31T15:12:46+00:00"
+        }
+      ],
+      "note": "script did not pass fact-check and policy review after 2 revisions"
     }
   ]
 }
