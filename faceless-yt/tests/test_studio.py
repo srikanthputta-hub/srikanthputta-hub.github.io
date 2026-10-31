@@ -406,3 +406,14 @@ def test_studio_skips_fred_when_it_is_unreachable(studio_env, monkeypatch):
     monkeypatch.setattr(P, "llm", model)
     assert studio.run_studio(dry_run=True) == 0
     assert seen["catalog_has_us_series"] is False
+
+
+def test_dashboard_desks_match_the_role_registry():
+    import re
+    from studio_lib.roles import ROLES
+    html = (REPO / "studio" / "index.html").read_text()
+    order = re.findall(r'"([a-z_]+)"', re.search(r"var ORDER=\[(.*?)\];", html).group(1))
+    extra = re.findall(r'"([a-z_]+)"', re.search(r"var RING=ORDER\.concat\(\[(.*?)\]\)", html).group(1))
+    on_board = set(order + extra + ["boss"])
+    assert on_board == {r["id"] for r in ROLES}, on_board ^ {r["id"] for r in ROLES}
+    assert len(order + extra) == 16  # the ring has exactly 16 desk slots; the boss has its own
