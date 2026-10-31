@@ -15,6 +15,25 @@ CFG = json.loads((HERE / "config.json").read_text())
 OUT = HERE / "output"
 HISTORY = HERE / "history.json"
 MODEL = "claude-sonnet-5-5"
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")  # free tier; override if Google retires it
+
+
+def llm(prompt, max_tokens=6000):
+    """Free path: Gemini (GEMINI_API_KEY). Paid path: Claude (ANTHROPIC_API_KEY). Gemini wins if both are set."""
+    if os.environ.get("GEMINI_API_KEY"):
+        r = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
+            headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"]}, timeout=180,
+            json={"contents": [{"parts": [{"text": prompt}]}],
+                  "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}})
+        r.raise_for_status()
+        return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        import anthropic
+        m = anthropic.Anthropic().messages.create(model=MODEL, max_tokens=max_tokens,
+                                                  messages=[{"role": "user", "content": prompt}])
+        return m.content[0].text
+    raise RuntimeError("No LLM key found: set GEMINI_API_KEY (free) or ANTHROPIC_API_KEY as a secret")
 SIZE = (1080, 1920) if CFG["format"] == "short" else (1920, 1080)
 
 
@@ -116,14 +135,11 @@ Exactly {n} scenes."""
 
 
 def ask_json(prompt, n_scenes=None, tries=3):
-    """Call Claude for a JSON object; retry on malformed output or wrong scene count."""
-    import anthropic
+    """Call the LLM for a JSON object; retry on malformed output or wrong scene count."""
     err = None
     for _ in range(tries):
         try:
-            msg = anthropic.Anthropic().messages.create(
-                model=MODEL, max_tokens=6000, messages=[{"role": "user", "content": prompt}])
-            text = msg.content[0].text
+            text = llm(prompt)
             data = json.loads(text[text.index("{"): text.rindex("}") + 1])
             scenes = data["scenes"]
             assert all(s.get("narration") and s.get("search_query") for s in scenes), "empty scene field"
@@ -131,6 +147,8 @@ def ask_json(prompt, n_scenes=None, tries=3):
             if n_scenes:
                 assert abs(len(scenes) - n_scenes) <= 2, f"got {len(scenes)} scenes"
             return data
+        except RuntimeError as e:  # missing key: retrying can't help
+            raise
         except Exception as e:
             err = e
             print("script attempt failed:", e)
