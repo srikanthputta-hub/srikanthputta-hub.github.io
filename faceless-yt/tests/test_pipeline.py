@@ -52,9 +52,10 @@ def test_thumbnail_renders(tmp_path, monkeypatch):
     monkeypatch.setattr(P, "OUT", tmp_path)
     (tmp_path / "work").mkdir()
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=1080x1920:d=2",
-                    str(tmp_path / "work" / "v0.mp4")], check=True)
+                    str(tmp_path / "work" / "v0_0.mp4")], check=True)
     from PIL import Image
-    assert Image.open(P.make_thumbnail(None, "STOP SAVING WRONG")).size == (1280, 720)
+    monkeypatch.setitem(P.CFG, "ai_thumbnails", False)
+    assert Image.open(P.make_thumbnail(None, "STOP SAVING $250K WRONG")).size == (1280, 720)
 
 
 def test_missing_key_fails_fast(monkeypatch):
@@ -146,3 +147,26 @@ def test_llm_falls_back_to_groq_when_gemini_out_of_credit(monkeypatch):
         return R(True, {"choices": [{"message": {"content": "from groq"}}]})
     monkeypatch.setattr(P.requests, "get", get); monkeypatch.setattr(P.requests, "post", post)
     assert P.llm("p") == "from groq"
+
+
+def test_scene_normalisation_accepts_old_and_new_shape(monkeypatch):
+    new = dict(SCRIPT, scenes=[{"narration": "x", "search_queries": ["a", "b"], "callout": "RULE OF 72"}] * P.CFG["scenes"])
+    fake_llm(monkeypatch, [json.dumps(new)])
+    s = P.ask_json("x", P.CFG["scenes"])["scenes"][0]
+    assert s["search_query"] == "a" and s["search_queries"] == ["a", "b"]
+    fake_llm(monkeypatch, [json.dumps(SCRIPT)])
+    assert P.ask_json("x", P.CFG["scenes"])["scenes"][0]["search_queries"] == ["money"]
+
+
+def test_scene_clip_cuts_and_callout(tmp_path, monkeypatch):
+    monkeypatch.setitem(P.CFG, "format", "long")
+    monkeypatch.setattr(P, "SIZE", (640, 360))
+    used = []
+    def fake_fetch(q, dest, secs):
+        used.append(q)
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"color=c=blue:s=640x360:d={secs}:r=30",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)], check=True)
+    monkeypatch.setattr(P, "fetch_clip", fake_fetch)
+    sc = {"narration": "x", "search_query": "a", "search_queries": ["a", "b", "c"], "callout": "$200/MONTH = $250K"}
+    out = P.build_scene_clip(sc, 0, 14.0, tmp_path)
+    assert used == ["a", "b", "c"] and out.exists() and abs(P.duration(out) - 14.0) < 0.5

@@ -22,3 +22,7 @@ The weekly workflow refills ideas and writes the review every Monday. Run it man
 - Every script gets a second Claude pass as fact-checker/compliance editor. If that pass fails the run aborts rather than publishing unchecked finance content.
 - Add affiliate links under `affiliate_links` in `config.json` as `[{"label": "...", "url": "..."}]`; they are appended to descriptions with a disclosure line. Only use programs you have actually joined.
 - `python -m pytest faceless-yt/tests` runs the offline tests (also run in CI).
+
+## Visuals
+- Each scene cuts between 3 different concrete stock searches (~5s per cut) instead of looping one clip, with a light colour grade and an animated on-screen callout (key number/term) on about half the scenes.
+- Thumbnails: best frame of the footage, or a free AI-generated background (Pollinations, `ai_thumbnails` in `config.json`; falls back to footage if unavailable), left-aligned bold text with the number highlighted, channel logo.
