@@ -132,6 +132,7 @@ def studio_env(tmp_path, monkeypatch):
     for k in ("GEMINI_API_KEY", "GROQ_API_KEY", "ANTHROPIC_API_KEY", "PEXELS_API_KEY", "PIXABAY_API_KEY"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("STUDIO_BOARD", "off")  # no network to the live board in tests unless a test turns it on
+    monkeypatch.setattr(data, "fred_ok", lambda: True)  # tests never touch the real network
     monkeypatch.setattr(data, "fetch_text", lambda url, params=None: CSV)
     monkeypatch.setattr(data, "fetch_json", lambda url, params=None: WB)
     orig = chart_lib.render_chart_video
@@ -372,3 +373,36 @@ def test_dashboard_page_and_writer_use_the_same_board():
     assert "studio_board" in (REPO / "studio" / "migrations" / "001_studio_board.sql").read_text()
     # the page never needs a secret: only the public publishable key, and the table is read-only for it apart from status columns
     assert "service_role" not in html and "sb_secret" not in html
+
+
+def test_thin_scenes_trigger_a_retry_with_feedback(monkeypatch):
+    asked = []
+    short = " ".join(["word"] * 30)
+    full = " ".join(["word"] * 65)
+    def model(prompt, max_tokens=6000):
+        if "Plan a" in prompt:
+            return json.dumps({"title": "T", "description": "d", "tags": [], "thumbnail_text": "X", "thumbnail_prompt": "", "our_take": "y",
+                               "acts": [{"name": f"A{i}", "beats": [{"beat": "b", "chart": ""}, {"beat": "c", "chart": ""}]} for i in range(3)]})
+        asked.append("IMPORTANT" in prompt)
+        text = full if "IMPORTANT" in prompt else short
+        return json.dumps({"scenes": [{"narration": text, "search_queries": ["a"], "callout": "", "chart": ""}] * 2})
+    monkeypatch.setattr(P, "llm", model)
+    monkeypatch.setattr(crew.time, "sleep", lambda s: None)
+    script = crew.write_script({"working_title": "T", "angle": "a", "our_take": "x"}, "sheet", [], 6)
+    assert asked == [False, True, False, True, False, True]  # each act: thin first, redone with feedback
+    assert all(len(s["narration"].split()) == 65 for s in script["scenes"])
+
+
+def test_studio_skips_fred_when_it_is_unreachable(studio_env, monkeypatch):
+    monkeypatch.setattr(data, "fred_ok", lambda: False)
+    seen = {}
+    base = fake_model()
+    def model(prompt, max_tokens=6000):
+        if "You are the Researcher" in prompt:
+            seen["catalog_has_us_series"] = "US series" in prompt
+            return json.dumps({"charts": [{"series": "wb_inflation", "countries": ["US"], "start_year": 2000, "title": "Inflation"},
+                                          {"series": "wb_gdp_growth", "countries": ["US", "DE"], "start_year": 2000, "title": "Growth"}]})
+        return base(prompt, max_tokens)
+    monkeypatch.setattr(P, "llm", model)
+    assert studio.run_studio(dry_run=True) == 0
+    assert seen["catalog_has_us_series"] is False

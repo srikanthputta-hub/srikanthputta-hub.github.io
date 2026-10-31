@@ -8,6 +8,8 @@ import time
 import pipeline
 from . import data
 
+MIN_SCENE_WORDS = 50
+
 POSITIONING = (
     "'The Money Blueprint' is a faceless YouTube channel that explains how money and the economy work using real public "
     "data (inflation, interest rates, money supply, debt, jobs, housing). It is educational storytelling. It NEVER gives "
@@ -53,7 +55,7 @@ def head_of_content(past_titles, ideas, perf):
     ideas_txt = "; ".join(i["title"] for i in ideas[:8]) or "none yet"
     prompt = f"""You are the Head of Content. {POSITIONING}
 Audience: {pipeline.CFG['audience']}
-Choose the next video: a 'why did this happen / how does this work' explainer that real public data can answer.
+Choose the next video: a 'why did this happen / how does this work' explainer that real public data can answer. Public data is annual and runs to about 2023, so pick stories that data up to then can tell.
 Already published (do not repeat or closely echo): {past_titles[-30:]}
 Backlog ideas (use one if it fits): {ideas_txt}{perf}
 Return ONLY JSON: {{"topic": "...", "working_title": "curiosity-driven, under 70 chars, no clickbait lies", "angle": "the specific question this video answers", "our_take": "the original insight or point of view viewers get only here (one or two sentences)", "idea": "backlog idea title used or empty"}}"""
@@ -70,9 +72,10 @@ def researcher(brief, only=None):
 Pick 3 or 4 charts from ONLY these datasets (they are real; do not invent others):
 {data.catalog_text(only)}
 Return ONLY JSON: {{"charts": [{{"series": "catalog id", "countries": ["US"], "start_year": 2000, "title": "short chart title", "why": "what this chart shows, under 12 words"}}]}}
-Use countries only for World Bank series. Choose start years that show the story (long enough for 15+ points)."""
+Use countries only for World Bank series. Choose start years that show the story (long enough for 15+ points). World Bank data is annual and runs to about 2023, so frame the story as history."""
     plan = json_call(prompt, 1200)
-    plan["charts"] = [c for c in plan.get("charts", []) if isinstance(c, dict) and c.get("series") in data.CATALOG]
+    plan["charts"] = [dict(c, title=plain(c.get("title", "")), why=plain(c.get("why", ""))) for c in plan.get("charts", [])
+                      if isinstance(c, dict) and c.get("series") in data.CATALOG]
     return plan
 
 
@@ -112,15 +115,21 @@ FACT SHEET (only numbers you may quote; quote them exactly, rounding to a whole 
 {sheet}
 Story so far (last lines): {prev or 'this is the first act'}
 Write one scene per beat, in order. Beats: {beats}
-Rules: 3-4 spoken sentences per scene (about 70 words), calm and curious, plain words. Explain what happened and why; never tell viewers what to do, never claim expertise, no hype, no predictions. If a beat has a chart, say what the chart shows with exact numbers from the sheet.
+Rules: each scene is 4 spoken sentences, 60 to 80 words (count them; short scenes are rejected). Calm and curious, plain words. Explain what happened and why; never tell viewers what to do, never claim expertise, no hype, no predictions. If a beat has a chart, say what the chart shows with exact numbers from the sheet.
 search_queries: 3 concrete, filmable stock-footage searches (people, places, objects, actions). Never charts or graphics. callout: 5 words or fewer with a key number or term, or empty.
 Return ONLY JSON: {{"scenes": [{{"narration": "...", "search_queries": ["...", "...", "..."], "callout": "", "chart": "c1 or empty"}}]}}"""
-        got = None
+        got, best_avg, ask = None, -1, prompt
         for _ in range(3):
-            res = json_call(prompt, 4500)
-            got = [s for s in res.get("scenes", []) if str(s.get("narration", "")).strip()]
-            if len(got) >= len(act["beats"]) - 1:
+            res = json_call(ask, 4500)
+            cand = [s for s in res.get("scenes", []) if str(s.get("narration", "")).strip()]
+            if len(cand) < len(act["beats"]) - 1:
+                continue
+            avg = sum(len(str(s["narration"]).split()) for s in cand) / len(cand)
+            if avg > best_avg:
+                got, best_avg = cand, avg
+            if avg >= MIN_SCENE_WORDS:
                 break
+            ask = prompt + f"\nIMPORTANT: your last attempt averaged only {avg:.0f} words per scene. Write 4 full sentences and 60 to 80 words in every scene."
         if not got:
             raise RuntimeError(f"Scriptwriter returned no scenes for act {a_i + 1}")
         chapters.append({"title": plain(act["name"]), "scene": len(scenes)})

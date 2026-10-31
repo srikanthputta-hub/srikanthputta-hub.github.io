@@ -111,7 +111,10 @@ def _run(log, dry_run, cfg):
     log.stage("head_of_content", "done", brief["working_title"])
 
     log.begin("researcher", "choosing real datasets to chart", 2)
-    plan = crew.researcher(brief)
+    use_fred = data.fred_ok()
+    if not use_fred:
+        print("FRED is unreachable from this runner; using World Bank data only")
+    plan = crew.researcher(brief, only=None if use_fred else "wb")
     log.stage("researcher", "done", f"{len(plan['charts'])} chart(s) planned")
 
     log.begin("data_analyst", "downloading FRED and World Bank data", 3)

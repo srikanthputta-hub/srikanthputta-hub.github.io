@@ -66,6 +66,15 @@ def fetch_json(url, params=None):
     return _get(url, params).json()
 
 
+def fred_ok():
+    """FRED often hangs when called from cloud runners. One quick probe decides whether to use it at all."""
+    try:
+        r = requests.get(FRED_CSV, params={"id": "UNRATE", "cosd": "2024-01-01"}, timeout=(8, 15), headers={"User-Agent": "money-blueprint-studio/1.0"})
+        return r.ok and "UNRATE" in r.text[:40]
+    except requests.RequestException:
+        return False
+
+
 def parse_fred(text, spec):
     """FRED csv -> [(year_fraction, value)] with optional monthly averaging, year-over-year and scaling."""
     rows = []
