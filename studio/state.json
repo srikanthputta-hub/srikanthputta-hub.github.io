@@ -1,118 +1,55 @@
 {
-  "updated": "2026-10-31T15:12:46+00:00",
+  "updated": "2026-10-31T19:48:39+00:00",
   "channel": "The Money Blueprint",
   "roles": [
     {
-      "id": "head_of_content",
-      "title": "Head of Content",
-      "dept": "Editorial",
+      "id": "producer",
+      "title": "Producer",
+      "dept": "Newsroom",
       "kind": "llm",
-      "summary": "Picks the next topic and angle from the idea backlog and what performed; owns the calendar."
+      "summary": "Picks each topic and angle, convenes the team, and makes the final go / no-go: every gate must pass or nothing ships."
     },
     {
       "id": "researcher",
       "title": "Researcher",
-      "dept": "Editorial",
+      "dept": "Newsroom",
       "kind": "llm",
-      "summary": "Chooses which real public datasets answer the question and what to chart."
+      "summary": "Finds the real data that answers the question, downloads it, and hands the team a fact sheet with the biggest moves highlighted."
     },
     {
-      "id": "data_analyst",
-      "title": "Data Analyst",
-      "dept": "Editorial",
-      "kind": "code",
-      "summary": "Downloads FRED / World Bank data and writes the fact sheet: the only numbers a script may cite."
-    },
-    {
-      "id": "scriptwriter",
-      "title": "Scriptwriter",
-      "dept": "Editorial",
+      "id": "writer",
+      "title": "Writer",
+      "dept": "Newsroom",
       "kind": "llm",
-      "summary": "Writes the outline, then the script act by act, quoting only the fact sheet."
+      "summary": "Outlines the video, writes the script act by act from the fact sheet, and revises it with the Editor's notes."
     },
     {
-      "id": "fact_checker",
-      "title": "Fact-checker",
+      "id": "editor",
+      "title": "Editor",
       "dept": "Standards",
       "kind": "llm",
-      "summary": "Checks every claim against the fact sheet and flags anything doubtful."
+      "summary": "The quality gate: pre-flights the outline, fact-checks every figure, enforces YouTube's rules (no advice, persona or hype) and blocks repeats."
     },
     {
-      "id": "policy_editor",
-      "title": "Policy Editor",
-      "dept": "Standards",
+      "id": "designer",
+      "title": "Designer",
+      "dept": "Production",
       "kind": "llm",
-      "summary": "Enforces YouTube monetization rules: no advice, no expert persona, no hype or predictions."
+      "summary": "Plans the visuals from the finished script (animated charts, concrete footage, callouts) and designs a thumbnail that matches the title."
     },
     {
-      "id": "originality_editor",
-      "title": "Originality Editor",
-      "dept": "Standards",
-      "kind": "code",
-      "summary": "Blocks repetitive or templated scripts and requires a real point of view."
-    },
-    {
-      "id": "director",
-      "title": "Director",
+      "id": "post_production",
+      "title": "Post-Production",
       "dept": "Production",
       "kind": "code",
-      "summary": "Assigns charts and concrete b-roll to scenes and checks pacing."
-    },
-    {
-      "id": "chart_designer",
-      "title": "Chart Designer",
-      "dept": "Production",
-      "kind": "code",
-      "summary": "Animates the real data into branded charts."
-    },
-    {
-      "id": "voice_actor",
-      "title": "Voice Actor",
-      "dept": "Production",
-      "kind": "code",
-      "summary": "Records the narration (free neural TTS) with word-accurate captions."
-    },
-    {
-      "id": "video_editor",
-      "title": "Video Editor",
-      "dept": "Production",
-      "kind": "code",
-      "summary": "Cuts footage, charts, callouts, music and captions into the final video."
-    },
-    {
-      "id": "thumbnail_designer",
-      "title": "Thumbnail Designer",
-      "dept": "Production",
-      "kind": "code",
-      "summary": "Builds the thumbnail from the best frame or an AI background."
+      "summary": "Records the narration and cuts voice, charts, footage, captions and music into the final video."
     },
     {
       "id": "publisher",
       "title": "Publisher",
       "dept": "Publishing & Growth",
-      "kind": "code",
-      "summary": "Writes chapters, sources and disclosure, then uploads."
-    },
-    {
-      "id": "producer",
-      "title": "Producer",
-      "dept": "Publishing & Growth",
-      "kind": "code",
-      "summary": "Final go / no-go: every gate must pass or nothing ships."
-    },
-    {
-      "id": "analyst",
-      "title": "Channel Analyst",
-      "dept": "Publishing & Growth",
       "kind": "llm",
-      "summary": "Weekly review of views and retention; feeds the Head of Content."
-    },
-    {
-      "id": "ops",
-      "title": "Operations",
-      "dept": "Operations",
-      "kind": "code",
-      "summary": "Watches every run and opens an issue when something breaks."
+      "summary": "Writes the title, description and chapters, uploads, and reviews how the channel is doing."
     },
     {
       "id": "boss",
@@ -334,6 +271,168 @@
         }
       ],
       "note": "script did not pass fact-check and policy review after 2 revisions"
+    },
+    {
+      "id": "20261031-192429",
+      "started": "2026-10-31T19:24:29+00:00",
+      "finished": "2026-10-31T19:48:39+00:00",
+      "mode": "dry-run",
+      "status": "dry-run",
+      "title": "What Drove the 2021-22 Inflation Surge? Money, Debt & Prices",
+      "topic": "The 2021-2022 Inflation Surge: Causes Explained with Public Data",
+      "video_id": null,
+      "gates": [
+        {
+          "name": "real_data",
+          "passed": true,
+          "detail": "3 chart(s) from real data"
+        },
+        {
+          "name": "greenlight",
+          "passed": true,
+          "detail": "outline approved: every chart has a scene; 0 pre-flight concern(s) handed to the Writer"
+        },
+        {
+          "name": "structure",
+          "passed": true,
+          "detail": "20 scenes, 1410 words"
+        },
+        {
+          "name": "numbers_and_facts",
+          "passed": true,
+          "detail": "all figures trace to the fact sheet and the Editor found nothing"
+        },
+        {
+          "name": "policy",
+          "passed": true,
+          "detail": "no advice, expert persona or hype"
+        },
+        {
+          "name": "structure_after_review",
+          "passed": true,
+          "detail": "1388 words after review"
+        },
+        {
+          "name": "originality",
+          "passed": true,
+          "detail": "distinct from published scripts and has its own point of view"
+        },
+        {
+          "name": "length",
+          "passed": true,
+          "detail": "10.0 min (minimum 6)"
+        },
+        {
+          "name": "packaging",
+          "passed": true,
+          "detail": "title and thumbnail make the same promise: What Drove the 2021-22 Inflation Surge? Money, Debt & Prices / MONEY VS INFLATION"
+        }
+      ],
+      "stages": [
+        {
+          "role": "producer",
+          "status": "done",
+          "note": "Why Inflation Skyrocketed in 2021-22",
+          "at": "2026-10-31T19:24:32+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "US Broad Money (% of GDP), US Consumer Price Inflation, US Government Debt (% of GDP)",
+          "at": "2026-10-31T19:24:49+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "outline: 20 scenes in 3 acts",
+          "at": "2026-10-31T19:24:56+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "pre-flight: 0 concern(s) passed to the Writer",
+          "at": "2026-10-31T19:24:56+00:00"
+        },
+        {
+          "role": "designer",
+          "status": "done",
+          "note": "charts placed: c1 at scene 5, c2 at scene 11, c3 at scene 7",
+          "at": "2026-10-31T19:24:57+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "20 scenes, 1410 words",
+          "at": "2026-10-31T19:25:40+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "round 1: 0 issue(s) from the read, 1 automatic flag(s)",
+          "at": "2026-10-31T19:26:05+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "scenes revised",
+          "at": "2026-10-31T19:26:06+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "round 2: 0 issue(s) from the read, 1 automatic flag(s)",
+          "at": "2026-10-31T19:26:19+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "scenes revised",
+          "at": "2026-10-31T19:26:45+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "round 3: 0 issue(s) from the read, 0 automatic flag(s)",
+          "at": "2026-10-31T19:26:57+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "originality ok",
+          "at": "2026-10-31T19:26:58+00:00"
+        },
+        {
+          "role": "designer",
+          "status": "done",
+          "note": "8 chart scene(s), 3 animated chart(s)",
+          "at": "2026-10-31T19:28:04+00:00"
+        },
+        {
+          "role": "post_production",
+          "status": "done",
+          "note": "20 scenes voiced and cut into 10.0 minutes",
+          "at": "2026-10-31T19:48:27+00:00"
+        },
+        {
+          "role": "publisher",
+          "status": "done",
+          "note": "title: What Drove the 2021-22 Inflation Surge? Money, Debt & Prices",
+          "at": "2026-10-31T19:48:37+00:00"
+        },
+        {
+          "role": "designer",
+          "status": "done",
+          "note": "thumbnail: MONEY VS INFLATION",
+          "at": "2026-10-31T19:48:38+00:00"
+        },
+        {
+          "role": "producer",
+          "status": "done",
+          "note": "every gate passed; dry run, nothing uploaded",
+          "at": "2026-10-31T19:48:39+00:00"
+        }
+      ],
+      "note": "all gates passed; would publish"
     }
   ]
 }
