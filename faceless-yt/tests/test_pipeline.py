@@ -8,15 +8,8 @@ SCRIPT = {"title": "T", "description": "D", "tags": [], "thumbnail_text": "STOP 
           "scenes": [{"narration": f"Scene {i} words here for you.", "search_query": "money"} for i in range(P.CFG["scenes"])]}
 
 
-def fake_llm(responses):
-    """Patch anthropic so each call returns the next response string."""
-    class Msg:
-        def __init__(self, t): self.content = [type("B", (), {"text": t})]
-    class Client:
-        def __init__(self): self.messages = self
-        def create(self, **kw): return Msg(responses.pop(0))
-    import types
-    return types.SimpleNamespace(Anthropic=Client)
+def fake_llm(monkeypatch, responses):
+    monkeypatch.setattr(P, "llm", lambda prompt, max_tokens=6000: responses.pop(0))
 
 
 def test_srt_uses_real_word_times():
@@ -26,21 +19,21 @@ def test_srt_uses_real_word_times():
 
 
 def test_ask_json_retries_then_succeeds(monkeypatch):
-    monkeypatch.setitem(sys.modules, "anthropic", fake_llm(["not json", json.dumps(SCRIPT)]))
+    fake_llm(monkeypatch, ["not json", json.dumps(SCRIPT)])
     monkeypatch.setattr(P.time, "sleep", lambda s: None)
     assert P.ask_json("x", P.CFG["scenes"])["title"] == "T"
 
 
 def test_ask_json_rejects_wrong_scene_count(monkeypatch):
     bad = dict(SCRIPT, scenes=SCRIPT["scenes"][:2])
-    monkeypatch.setitem(sys.modules, "anthropic", fake_llm([json.dumps(bad)] * 3))
+    fake_llm(monkeypatch, [json.dumps(bad)] * 3)
     monkeypatch.setattr(P.time, "sleep", lambda s: None)
     with pytest.raises(RuntimeError):
         P.ask_json("x", P.CFG["scenes"])
 
 
 def test_fact_check_failure_blocks_publishing(monkeypatch):
-    monkeypatch.setitem(sys.modules, "anthropic", fake_llm(["garbage", "garbage"]))
+    fake_llm(monkeypatch, ["garbage", "garbage"])
     monkeypatch.setattr(P.time, "sleep", lambda s: None)
     with pytest.raises(RuntimeError, match="fact-check failed"):
         P.fact_check(SCRIPT)
@@ -62,3 +55,22 @@ def test_thumbnail_renders(tmp_path, monkeypatch):
                     str(tmp_path / "work" / "v0.mp4")], check=True)
     from PIL import Image
     assert Image.open(P.make_thumbnail(None, "STOP SAVING WRONG")).size == (1280, 720)
+
+
+def test_missing_key_fails_fast(monkeypatch):
+    for k in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(P.time, "sleep", lambda s: (_ for _ in ()).throw(AssertionError("must not retry")))
+    with pytest.raises(RuntimeError, match="No LLM key"):
+        P.ask_json("x")
+
+
+def test_gemini_request_shape(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    seen = {}
+    class R:
+        def raise_for_status(self): pass
+        def json(self): return {"candidates": [{"content": {"parts": [{"text": "hi"}]}}]}
+    def post(url, **kw): seen.update(url=url, **kw); return R()
+    monkeypatch.setattr(P.requests, "post", post)
+    assert P.llm("p") == "hi" and "generateContent" in seen["url"] and seen["headers"]["x-goog-api-key"] == "k"

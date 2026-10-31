@@ -6,14 +6,11 @@
   python strategy.py review   # REVIEW.md: weekly analytics review of published videos
 """
 import json, sys
-import anthropic
 import pipeline as P
 
 
 def ask(prompt, tokens=6000):
-    m = anthropic.Anthropic().messages.create(model=P.MODEL, max_tokens=tokens,
-                                              messages=[{"role": "user", "content": prompt}])
-    return m.content[0].text
+    return P.llm(prompt, tokens)
 
 
 def ctx():
