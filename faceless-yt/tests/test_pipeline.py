@@ -118,10 +118,16 @@ def test_footage_falls_back_from_pexels_to_pixabay(tmp_path, monkeypatch):
 
 
 def test_groq_model_pick():
-    models = [{"id": "llama-3.1-8b-instant", "active": True}, {"id": "llama-3.3-70b-versatile", "active": True},
-              {"id": "llama-guard-4-12b", "active": True}, {"id": "whisper-large-v3", "active": True},
-              {"id": "llama-9-400b-old", "active": False}]
-    assert P.pick_groq_model(models) == "llama-3.3-70b-versatile"
+    llama = [{"id": "llama-3.1-8b-instant"}, {"id": "llama-3.3-70b-versatile"}, {"id": "llama-guard-4-12b"},
+             {"id": "whisper-large-v3"}, {"id": "llama-9-400b-old", "active": False}]
+    assert P.pick_groq_model(llama) == "llama-3.3-70b-versatile"
+    modern = [{"id": "openai/gpt-oss-120b"}, {"id": "openai/gpt-oss-20b"}, {"id": "qwen/qwen3-32b"},
+              {"id": "meta-llama/llama-4-scout-17b-16e-instruct"}, {"id": "meta-llama/llama-prompt-guard-2-22m"},
+              {"id": "playai-tts"}, {"id": "groq/compound"}, {"id": "whisper-large-v3-turbo"}]
+    assert P.pick_groq_model(modern) == "openai/gpt-oss-120b"
+    assert P.pick_groq_model([{"id": "some-new-chat-model"}, {"id": "playai-tts"}]) == "some-new-chat-model"
+    with pytest.raises(RuntimeError, match="models seen: whisper-large-v3"):
+        P.pick_groq_model([{"id": "whisper-large-v3"}])
 
 
 def test_llm_falls_back_to_groq_when_gemini_out_of_credit(monkeypatch):

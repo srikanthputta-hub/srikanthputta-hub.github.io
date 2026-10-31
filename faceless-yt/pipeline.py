@@ -61,16 +61,23 @@ def _gemini(prompt, max_tokens, key):
 
 
 def pick_groq_model(models):
-    """Largest active Llama chat model; GROQ_MODEL overrides."""
-    cands = []
+    """Largest active text-chat model (any family); GROQ_MODEL overrides. Lists ids when nothing fits."""
+    skip = ("whisper", "tts", "guard", "safeguard", "embed", "orpheus", "compound", "vision", "distil")
+    sized, unsized = [], []
     for m in models:
         mid = m["id"]
-        size = re.search(r"(\d+)b", mid)
-        if m.get("active", True) and "llama" in mid and size and not any(s in mid for s in ("guard", "whisper", "tts")):
-            cands.append((int(size.group(1)), "versatile" in mid, mid))
-    if not cands:
-        raise RuntimeError("No Llama chat model available on this Groq account")
-    return max(cands)[2]
+        if m.get("active", True) is False or any(s in mid.lower() for s in skip):
+            continue
+        size = re.search(r"(?<![\d.])(\d+)b(?![a-z])", mid.lower())
+        if size:
+            sized.append((int(size.group(1)), "versatile" in mid or "instruct" in mid, mid))
+        else:
+            unsized.append(mid)
+    if sized:
+        return max(sized)[2]
+    if unsized:
+        return sorted(unsized)[-1]
+    raise RuntimeError("No usable chat model on this Groq account; models seen: " + ", ".join(m["id"] for m in models))
 
 
 def _groq(prompt, max_tokens, key):
