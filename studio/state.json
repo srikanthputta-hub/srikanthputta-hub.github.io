@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-31T19:48:39+00:00",
+  "updated": "2026-10-31T20:56:21+00:00",
   "channel": "The Money Blueprint",
   "roles": [
     {
@@ -433,6 +433,118 @@
         }
       ],
       "note": "all gates passed; would publish"
+    },
+    {
+      "id": "20261031-205355",
+      "started": "2026-10-31T20:53:55+00:00",
+      "finished": "2026-10-31T20:56:21+00:00",
+      "mode": "live",
+      "status": "blocked",
+      "title": null,
+      "topic": "Why Did Inflation Spike in 2021-2022?",
+      "video_id": null,
+      "gates": [
+        {
+          "name": "real_data",
+          "passed": true,
+          "detail": "4 chart(s) from real data"
+        },
+        {
+          "name": "greenlight",
+          "passed": true,
+          "detail": "outline approved: every chart has a scene; 0 pre-flight concern(s) handed to the Writer"
+        },
+        {
+          "name": "structure",
+          "passed": true,
+          "detail": "16 scenes, 1150 words"
+        },
+        {
+          "name": "numbers_and_facts",
+          "passed": false,
+          "detail": "1 unresolved: The narration references federal relief packages and fiscal outlays, w"
+        },
+        {
+          "name": "policy",
+          "passed": true,
+          "detail": "no advice, expert persona or hype"
+        }
+      ],
+      "stages": [
+        {
+          "role": "producer",
+          "status": "done",
+          "note": "What Caused the 2021-22 Inflation Surge?",
+          "at": "2026-10-31T20:53:58+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "U.S. CPI Inflation Rate (2000-2023), U.S. Real Interest Rate (2000-2023), U.S. Broad Money Supply (% of GDP, 2000-2023), U.S. Real GDP Growth Rate (2000-2023)",
+          "at": "2026-10-31T20:54:17+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "outline: 16 scenes in 3 acts",
+          "at": "2026-10-31T20:54:24+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "pre-flight: 0 concern(s) passed to the Writer",
+          "at": "2026-10-31T20:54:24+00:00"
+        },
+        {
+          "role": "designer",
+          "status": "done",
+          "note": "charts placed: c1 at scene 15, c2 at scene 4, c3 at scene 5, c4 at scene 6",
+          "at": "2026-10-31T20:54:24+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "16 scenes, 1150 words",
+          "at": "2026-10-31T20:54:50+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "round 1: 0 issue(s) from the read, 3 automatic flag(s)",
+          "at": "2026-10-31T20:55:26+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "scenes revised",
+          "at": "2026-10-31T20:55:39+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "round 2: 1 issue(s) from the read, 0 automatic flag(s)",
+          "at": "2026-10-31T20:56:00+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "scenes revised",
+          "at": "2026-10-31T20:56:00+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "round 3: 1 issue(s) from the read, 0 automatic flag(s)",
+          "at": "2026-10-31T20:56:20+00:00"
+        },
+        {
+          "role": "producer",
+          "status": "blocked",
+          "note": "script did not pass the Editor's review after 2 revisions",
+          "at": "2026-10-31T20:56:20+00:00"
+        }
+      ],
+      "note": "script did not pass the Editor's review after 2 revisions"
     }
   ]
 }
