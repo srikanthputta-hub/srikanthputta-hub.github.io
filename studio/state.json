@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-31T20:56:21+00:00",
+  "updated": "2026-10-31T21:17:36+00:00",
   "channel": "The Money Blueprint",
   "roles": [
     {
@@ -545,6 +545,162 @@
         }
       ],
       "note": "script did not pass the Editor's review after 2 revisions"
+    },
+    {
+      "id": "20261031-210103",
+      "started": "2026-10-31T21:01:03+00:00",
+      "finished": "2026-10-31T21:17:36+00:00",
+      "mode": "live",
+      "status": "published",
+      "title": "The Post-2008 Housing Boom Explained",
+      "topic": "Why Did US Home Prices Surge After the 2008 Crisis?",
+      "video_id": "lONGgUhpMFw",
+      "gates": [
+        {
+          "name": "real_data",
+          "passed": true,
+          "detail": "4 chart(s) from real data"
+        },
+        {
+          "name": "greenlight",
+          "passed": true,
+          "detail": "outline approved: every chart has a scene; 0 pre-flight concern(s) handed to the Writer"
+        },
+        {
+          "name": "structure",
+          "passed": true,
+          "detail": "15 scenes, 1124 words"
+        },
+        {
+          "name": "numbers_and_facts",
+          "passed": true,
+          "detail": "all figures trace to the fact sheet and the Editor found nothing"
+        },
+        {
+          "name": "policy",
+          "passed": true,
+          "detail": "no advice, expert persona or hype"
+        },
+        {
+          "name": "structure_after_review",
+          "passed": true,
+          "detail": "1117 words after review"
+        },
+        {
+          "name": "originality",
+          "passed": true,
+          "detail": "distinct from published scripts and has its own point of view"
+        },
+        {
+          "name": "length",
+          "passed": true,
+          "detail": "8.1 min (minimum 6)"
+        },
+        {
+          "name": "packaging",
+          "passed": true,
+          "detail": "title and thumbnail make the same promise: The Post-2008 Housing Boom Explained / HOUSING BOOM"
+        }
+      ],
+      "stages": [
+        {
+          "role": "producer",
+          "status": "done",
+          "note": "The Post-2008 Housing Boom Explained",
+          "at": "2026-10-31T21:01:08+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "U.S. Real Interest Rate (%), 2005-2023, U.S. Broad Money Supply (% of GDP), 2005-2023, U.S. Unemployment Rate (%), 2005-2023, U.S. Real GDP Growth (%), 2005-2023",
+          "at": "2026-10-31T21:01:26+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "outline: 15 scenes in 3 acts",
+          "at": "2026-10-31T21:01:30+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "pre-flight: 0 concern(s) passed to the Writer",
+          "at": "2026-10-31T21:01:30+00:00"
+        },
+        {
+          "role": "designer",
+          "status": "done",
+          "note": "charts placed: c1 at scene 4, c2 at scene 5, c3 at scene 7, c4 at scene 8",
+          "at": "2026-10-31T21:01:30+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "15 scenes, 1124 words",
+          "at": "2026-10-31T21:01:57+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "round 1: 0 issue(s) from the read, 2 automatic flag(s)",
+          "at": "2026-10-31T21:02:21+00:00"
+        },
+        {
+          "role": "writer",
+          "status": "done",
+          "note": "scenes revised",
+          "at": "2026-10-31T21:02:33+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "round 2: 0 issue(s) from the read, 0 automatic flag(s)",
+          "at": "2026-10-31T21:02:58+00:00"
+        },
+        {
+          "role": "editor",
+          "status": "done",
+          "note": "originality ok",
+          "at": "2026-10-31T21:02:59+00:00"
+        },
+        {
+          "role": "designer",
+          "status": "done",
+          "note": "9 chart scene(s), 4 animated chart(s)",
+          "at": "2026-10-31T21:03:46+00:00"
+        },
+        {
+          "role": "post_production",
+          "status": "done",
+          "note": "15 scenes voiced and cut into 8.1 minutes",
+          "at": "2026-10-31T21:17:20+00:00"
+        },
+        {
+          "role": "publisher",
+          "status": "done",
+          "note": "title: The Post-2008 Housing Boom Explained",
+          "at": "2026-10-31T21:17:30+00:00"
+        },
+        {
+          "role": "designer",
+          "status": "done",
+          "note": "thumbnail: HOUSING BOOM",
+          "at": "2026-10-31T21:17:30+00:00"
+        },
+        {
+          "role": "producer",
+          "status": "done",
+          "note": "every gate passed: go",
+          "at": "2026-10-31T21:17:31+00:00"
+        },
+        {
+          "role": "publisher",
+          "status": "done",
+          "note": "published https://youtu.be/lONGgUhpMFw",
+          "at": "2026-10-31T21:17:36+00:00"
+        }
+      ],
+      "note": "https://youtu.be/lONGgUhpMFw"
     }
   ]
 }
