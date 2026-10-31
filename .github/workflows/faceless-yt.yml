@@ -42,7 +42,12 @@ jobs:
       - name: Save topic history
         run: |
           git config user.name "yt-bot" && git config user.email "yt-bot@users.noreply.github.com"
-          git add faceless-yt/history.json faceless-yt/ideas.json && (git commit -m "Update YT history" && git push) || true
+          for f in history.json ideas.json; do
+            if [ -f "faceless-yt/$f" ]; then git add "faceless-yt/$f"; fi
+          done
+          if ! git diff --cached --quiet; then
+            git commit -m "Update YT history" && git pull --rebase origin main && git push
+          fi
       - name: Open an issue if the run failed
         if: failure()
         env:
