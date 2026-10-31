@@ -131,6 +131,7 @@ def studio_env(tmp_path, monkeypatch):
         monkeypatch.setitem(P.CFG, k, v)
     for k in ("GEMINI_API_KEY", "GROQ_API_KEY", "ANTHROPIC_API_KEY", "PEXELS_API_KEY", "PIXABAY_API_KEY"):
         monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("STUDIO_BOARD", "off")  # no network to the live board in tests unless a test turns it on
     monkeypatch.setattr(data, "fetch_text", lambda url, params=None: CSV)
     monkeypatch.setattr(data, "fetch_json", lambda url, params=None: WB)
     orig = chart_lib.render_chart_video
@@ -290,3 +291,84 @@ def test_studio_falls_back_to_world_bank_when_fred_is_down(studio_env, monkeypat
     assert studio.run_studio(dry_run=True) == 0
     run = json.loads((studio_env / "studio" / "state.json").read_text())["runs"][-1]
     assert run["status"] == "dry-run" and any(s["note"].startswith("only") for s in run["stages"] if s["role"] == "researcher")
+
+
+# ---------- live Office board writer ----------
+from studio_lib import office
+
+
+class FakeResp:
+    status_code = 204
+    text = ""
+
+
+def test_board_updates_and_never_raises(monkeypatch):
+    calls = []
+    monkeypatch.setattr(office.requests, "patch", lambda url, json=None, headers=None, timeout=None: calls.append((url, json)) or FakeResp())
+    b = office.Board("video-1", 14, enabled=True)
+    b.reset(); b.start("researcher", "choosing datasets", 2); b.done("researcher", "4 charts planned"); b.mark("producer", "blocked", "gate failed")
+    assert calls[0][0].endswith("role=neq.__none__") and calls[0][1]["status"] == "idle"
+    assert calls[1] == (office.URL + "?role=eq.researcher", {**calls[1][1], "status": "working", "pipeline_name": "video-1", "pipeline_stage": 2, "pipeline_total": 14})
+    assert calls[2][1]["status"] == "idle" and calls[2][1]["description"] == "4 charts planned" and calls[2][1]["pipeline_name"] is None
+    assert calls[3][1]["status"] == "blocked"
+
+
+def test_board_gives_up_quietly_after_three_failures(monkeypatch):
+    import requests
+    n = {"c": 0}
+    def boom(*a, **k):
+        n["c"] += 1
+        raise requests.ConnectionError("blocked")
+    monkeypatch.setattr(office.requests, "patch", boom)
+    b = office.Board("v", 14, enabled=True)
+    for _ in range(6):
+        b.start("researcher", "x")
+    assert n["c"] == 3 and b.enabled is False
+
+
+def test_board_can_be_switched_off_by_env(monkeypatch):
+    monkeypatch.setenv("STUDIO_BOARD", "off")
+    monkeypatch.setattr(office.requests, "patch", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not be called")))
+    office.Board("v", 14).start("researcher", "x")
+
+
+def test_studio_run_drives_the_live_board_in_order(studio_env, monkeypatch):
+    events = []
+    monkeypatch.setenv("STUDIO_BOARD", "on")
+    def patch(url, json=None, headers=None, timeout=None):
+        events.append((url.split("?")[1], json.get("status"), json.get("pipeline_name")))
+        return FakeResp()
+    monkeypatch.setattr(office.requests, "patch", patch)
+    monkeypatch.setattr(P, "llm", fake_model())
+    assert studio.run_studio(dry_run=True) == 0
+    seq = [(q.split("role=eq.")[1], s) for q, s, _ in events if q.startswith("role=eq.")]
+    roles_started = [r for r, s in seq if s == "working"]
+    assert roles_started[0] == "ops" and roles_started.index("head_of_content") < roles_started.index("researcher") < roles_started.index("scriptwriter")
+    # the review pair works at the same time on the same pipeline (that is what seats them in the conference room)
+    i_fc = seq.index(("fact_checker", "working")); i_pe = seq.index(("policy_editor", "working"))
+    assert abs(i_fc - i_pe) == 1 and seq.index(("fact_checker", "idle")) > max(i_fc, i_pe)
+    assert len({p for q, s, p in events if s == "working"}) == 1  # one shared pipeline name for the whole video
+    assert seq[-1] == ("ops", "idle")
+
+
+def test_a_crash_marks_the_active_role_failed_on_the_board(studio_env, monkeypatch):
+    events = []
+    monkeypatch.setenv("STUDIO_BOARD", "on")
+    monkeypatch.setattr(office.requests, "patch", lambda url, json=None, headers=None, timeout=None: events.append((url.split("?")[1], json.get("status"))) or FakeResp())
+    def model(prompt, max_tokens=6000):
+        raise ValueError("every provider failed")
+    monkeypatch.setattr(P, "llm", model)
+    monkeypatch.setattr(crew.time, "sleep", lambda s: None)
+    with pytest.raises(RuntimeError):
+        studio.run_studio(dry_run=True)
+    assert ("role=eq.head_of_content", "failed") in events and events[-1] == ("role=eq.ops", "failed")
+
+
+def test_dashboard_page_and_writer_use_the_same_board():
+    import re
+    html = (REPO / "studio" / "index.html").read_text()
+    assert re.search(r'SB_URL="([^"]+)"', html).group(1) == office.URL
+    assert re.search(r'SB_KEY="([^"]+)"', html).group(1) == office.KEY
+    assert "studio_board" in (REPO / "studio" / "migrations" / "001_studio_board.sql").read_text()
+    # the page never needs a secret: only the public publishable key, and the table is read-only for it apart from status columns
+    assert "service_role" not in html and "sb_secret" not in html

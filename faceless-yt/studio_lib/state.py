@@ -14,15 +14,28 @@ def now():
 
 
 class RunLog:
+    board = None  # optional live Office board writer (studio_lib.office.Board)
+
     def __init__(self, dry_run):
         self.data = {"id": datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S"), "started": now(), "finished": None,
                      "mode": "dry-run" if dry_run else "live", "status": "running", "title": None, "topic": None,
                      "video_id": None, "gates": [], "stages": [], "note": ""}
 
+    def begin(self, role, text, stage=None):
+        """A role picks up its task: shows as working on the live board."""
+        print(f"[{role}] working: {text}")
+        if self.board:
+            self.board.start(role, text, stage)
+
     def stage(self, role, status, note=""):
         """status: done | skipped | failed | blocked"""
         self.data["stages"].append({"role": role, "status": status, "note": str(note)[:300], "at": now()})
         print(f"[{role}] {status} {str(note)[:140]}")
+        if self.board:
+            if status in ("done", "skipped"):
+                self.board.done(role, note)
+            else:
+                self.board.mark(role, status, note)
 
     def gate(self, name, passed, detail=""):
         self.data["gates"].append({"name": name, "passed": bool(passed), "detail": str(detail)[:300]})

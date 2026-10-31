@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 import pipeline
 from studio_lib import charts as chart_lib
-from studio_lib import crew, data, gates
+from studio_lib import crew, data, gates, office
 from studio_lib import state as state_lib
 
 LIBRARY = pipeline.HERE / "library"
@@ -81,9 +81,14 @@ def block(log, reason):
 def run_studio(dry_run):
     cfg = pipeline.CFG
     log = state_lib.RunLog(dry_run)
+    log.board = office.Board(pipeline=f"video-{log.data['id']}", total=14)
+    log.board.reset()
+    log.begin("ops", f"watching run {log.data['id']} ({log.data['mode']})")
     try:
         code = _run(log, dry_run, cfg)
+        log.stage("ops", "done", f"run {log.data['status']}: {log.data['title'] or log.data['note'] or 'no title'}"[:200])
     except Exception as e:
+        log.board.fail_active(f"{type(e).__name__}: {e}"[:200])
         log.stage("ops", "failed", f"{type(e).__name__}: {e}")
         log.finish("failed", f"{type(e).__name__}: {e}")
         raise
@@ -100,13 +105,16 @@ def _run(log, dry_run, cfg):
     ideas = [i for i in (json.loads(pipeline.IDEAS.read_text()) if pipeline.IDEAS.exists() else []) if not i.get("used")]
     perf = pipeline.performance_notes(history)
 
+    log.begin("head_of_content", "choosing the next topic and angle", 1)
     brief = crew.head_of_content([h["title"] for h in history], sorted(ideas, key=lambda i: -i.get("score", 0)), perf)
     log.set(topic=brief["topic"])
     log.stage("head_of_content", "done", brief["working_title"])
 
+    log.begin("researcher", "choosing real datasets to chart", 2)
     plan = crew.researcher(brief)
     log.stage("researcher", "done", f"{len(plan['charts'])} chart(s) planned")
 
+    log.begin("data_analyst", "downloading FRED and World Bank data", 3)
     charts, notes = [], []
 
     def collect(specs):
@@ -129,6 +137,7 @@ def _run(log, dry_run, cfg):
         return block(log, "not enough real data for a data-driven video")
     sheet, allowed = data.fact_sheet(charts)
 
+    log.begin("scriptwriter", "writing the outline and the script, act by act", 4)
     script = crew.write_script(brief, sheet, charts, cfg["scenes"])
     words = gates.word_count(script)
     log.stage("scriptwriter", "done", f"{len(script['scenes'])} scenes, {words} words")
@@ -140,6 +149,8 @@ def _run(log, dry_run, cfg):
     clean = False
     for rnd in range(3):
         issues = gates.number_issues(script, allowed) + gates.directive_issues(script)
+        log.begin("fact_checker", f"review round {rnd + 1}: checking every figure and claim", 5)
+        log.begin("policy_editor", f"review round {rnd + 1}: advice, persona and hype check", 6)
         fc, pe = crew.fact_check(script, sheet), crew.policy_review(script)
         log.stage("fact_checker", "done", f"round {rnd + 1}: {len(fc)} issue(s)")
         log.stage("policy_editor", "done", f"round {rnd + 1}: {len(pe)} issue(s), {len(issues)} automatic flag(s)")
@@ -154,17 +165,20 @@ def _run(log, dry_run, cfg):
     if not clean:
         return block(log, "script did not pass fact-check and policy review after 2 revisions")
 
+    log.begin("originality_editor", "comparing with published scripts", 7)
     problems = gates.originality_issues(script, load_library())
     log.gate("originality", not problems, "; ".join(problems) or "distinct from published scripts and has its own point of view")
     log.stage("originality_editor", "done" if not problems else "blocked", "; ".join(problems) or "ok")
     if problems:
         return block(log, "not original enough: " + "; ".join(problems))
 
+    log.begin("director", "assigning charts and b-roll", 8)
     script = direct(script, charts)
     log.stage("director", "done", f"{sum(1 for s in script['scenes'] if s['chart'])} chart scene(s)")
 
     work = pipeline.OUT / "work"
     work.mkdir(parents=True, exist_ok=True)
+    log.begin("chart_designer", "animating the real data", 9)
     rendered = 0
     by_id = {c["id"]: c for c in charts}
     for cid in sorted({s["chart"] for s in script["scenes"] if s["chart"]}):
@@ -181,6 +195,8 @@ def _run(log, dry_run, cfg):
         log.gate("charts_rendered", False, f"only {rendered} chart(s) rendered")
         return block(log, "charts failed to render")
 
+    log.begin("voice_actor", "recording the narration", 10)
+    log.begin("video_editor", "cutting video, charts, captions and music", 11)
     video = pipeline.render(script)
     durs = json.loads((work / "durs.json").read_text())
     minutes = sum(durs) / 60
@@ -190,18 +206,22 @@ def _run(log, dry_run, cfg):
     if minutes < cfg.get("min_minutes", 6):
         return block(log, f"video too short ({minutes:.1f} min)")
 
+    log.begin("thumbnail_designer", "designing the thumbnail", 12)
     thumb = pipeline.make_thumbnail(video, script["thumbnail_text"], script.get("thumbnail_prompt"))
     log.stage("thumbnail_designer", "done", script["thumbnail_text"])
+    log.begin("publisher", "adding chapters, sources and disclosure", 13)
     script["description"] = build_description(script, charts, durs)
     log.stage("publisher", "done", "chapters, sources and disclosure added")
     (pipeline.OUT / "script.json").write_text(json.dumps(script, indent=2))
 
     log.set(title=script["title"])
     if dry_run:
+        log.begin("producer", "final go / no-go (dry run)", 14)
         log.stage("producer", "done", "all gates passed; dry run, nothing uploaded")
         log.finish("dry-run", "all gates passed; would publish")
         return 0
 
+    log.begin("producer", "all gates passed: publishing", 14)
     vid = pipeline.upload(video, script, thumb)
     log.set(video_id=vid)
     log.stage("producer", "done", "all gates passed; published")
