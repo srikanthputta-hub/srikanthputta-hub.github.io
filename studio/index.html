@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Money Blueprint Studio</title>
+<meta name="description" content="Live board of the automated studio behind The Money Blueprint: who works on what, and whether the last video passed every gate.">
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--ink:#0b1f3a;--mute:#5a6b86;--line:#dbe2ee;--gold:#b97f00;--chip:#eef2f8;
+--ok:#12805c;--warn:#a65f00;--bad:#b3261e;--idle:#8b98ad;--hero:#0b1f3a;--hero-ink:#fff;--accent:#f5b82e}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#08162b;--card:#0f2644;--ink:#e8eef8;--mute:#9fb3cf;--line:#1e4a80;--gold:#f5b82e;--chip:#14325a;
+--ok:#4cd6a0;--warn:#ffb74d;--bad:#ff8a80;--idle:#6f84a6;--hero:#0f2644}}
+:root[data-theme=dark]{--bg:#08162b;--card:#0f2644;--ink:#e8eef8;--mute:#9fb3cf;--line:#1e4a80;--gold:#f5b82e;--chip:#14325a;--ok:#4cd6a0;--warn:#ffb74d;--bad:#ff8a80;--idle:#6f84a6;--hero:#0f2644}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px 48px}
+header{background:var(--hero);color:var(--hero-ink);padding:28px 0 24px}
+header .wrap{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;padding-bottom:0}
+h1{margin:0;font-size:1.6rem;letter-spacing:.2px}
+h1 span{color:var(--accent)}
+.sub{margin:4px 0 0;color:#b9c8df;font-size:.95rem}
+h2{font-size:1.1rem;margin:32px 0 12px;display:flex;align-items:center;gap:10px}
+h2 small{font-weight:400;color:var(--mute);font-size:.85rem}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--chip);color:var(--ink);font-size:.82rem;font-weight:600;white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--idle);flex:none}
+.s-done .dot,.s-published .dot,.s-pass .dot{background:var(--ok)}
+.s-dry-run .dot{background:var(--ok)}
+.s-blocked .dot,.s-skipped .dot{background:var(--warn)}
+.s-failed .dot,.s-fail .dot{background:var(--bad)}
+.s-running .dot{background:var(--accent)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.hero-run{display:grid;gap:12px}
+.hero-run .t{font-size:1.2rem;font-weight:700}
+.hero-run a{color:var(--gold)}
+.flow{display:flex;flex-wrap:wrap;gap:6px 4px;align-items:center;font-size:.8rem;color:var(--mute)}
+.flow .chip{font-size:.78rem}
+.gates{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.gate{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.gate b{display:block;font-size:.9rem}
+.gate span{color:var(--mute);font-size:.82rem;overflow-wrap:anywhere}
+.dept{margin:18px 0 8px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:700}
+.desks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.desk{display:flex;flex-direction:column;gap:6px;min-height:118px}
+.desk .name{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:700}
+.desk .job{color:var(--mute);font-size:.86rem}
+.desk .note{font-size:.82rem;border-top:1px dashed var(--line);padding-top:6px;margin-top:auto;overflow-wrap:anywhere}
+.kind{font-size:.7rem;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mute);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em}
+.scroll{overflow-x:auto}
+.empty{color:var(--mute);padding:8px 0}
+footer{color:var(--mute);font-size:.82rem;margin-top:36px}
+a{color:inherit}
+@media (max-width:560px){h1{font-size:1.35rem}.desks{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div><h1>The Money <span>Blueprint</span> Studio</h1>
+  <p class="sub">An automated studio: every video is researched, checked and gated by named roles before anything is published.</p></div>
+  <div id="updated" class="chip"><i class="dot"></i><span>loading…</span></div>
+</div></header>
+<main class="wrap" id="app" aria-live="polite">
+  <p class="empty">Loading the board…</p>
+</main>
+<script>
+(function(){
+  var ORDER=["head_of_content","researcher","data_analyst","scriptwriter","fact_checker","policy_editor","originality_editor","director","chart_designer","voice_actor","video_editor","thumbnail_designer","publisher","producer"];
+  var DEPTS=["Editorial","Standards","Production","Publishing & Growth","Operations"];
+  function el(tag,attrs,kids){var n=document.createElement(tag);
+    Object.keys(attrs||{}).forEach(function(k){if(k==="class")n.className=attrs[k];else n.setAttribute(k,attrs[k]);});
+    [].concat(kids==null?[]:kids).forEach(function(c){n.appendChild(typeof c==="string"?document.createTextNode(c):c);});return n;}
+  function chip(status,text){return el("span",{class:"chip s-"+status},[el("i",{class:"dot"}),text||status]);}
+  function load(u){return fetch(u+"?t="+Date.now()).then(function(r){if(!r.ok)throw new Error(u+" "+r.status);return r.json();});}
+  function when(iso){try{return new Date(iso).toLocaleString([], {dateStyle:"medium",timeStyle:"short"});}catch(e){return iso||"";}}
+  function nice(id){return id.replace(/_/g," ");}
+  function render(roles,state){
+    var app=document.getElementById("app");app.textContent="";
+    var runs=(state&&state.runs)||[];var last=runs[runs.length-1];
+    document.getElementById("updated").lastChild.textContent=state&&state.updated?"updated "+when(state.updated):"no runs yet";
+
+    app.appendChild(el("h2",{},["Latest run",el("small",{},[last?last.mode+" · "+when(last.started):""])]));
+    if(!last){app.appendChild(el("p",{class:"empty"},["The studio hasn't run yet. The first run will appear here."]));}
+    else{
+      var title=last.title||last.topic||"(no title: stopped before scripting)";
+      var link=last.video_id?el("a",{href:"https://youtu.be/"+encodeURIComponent(last.video_id),target:"_blank",rel:"noopener"},["Watch on YouTube"]):null;
+      var hero=el("div",{class:"card hero-run"},[
+        el("div",{},[chip(last.status,last.status)]),
+        el("div",{class:"t"},[title]),
+        last.note?el("div",{class:"empty"},[last.note]):"",
+        link||""]);
+      app.appendChild(hero);
+      app.appendChild(el("h2",{},["Quality gates",el("small",{},["every one must pass or nothing ships"])]));
+      var g=el("div",{class:"gates"});
+      (last.gates||[]).forEach(function(x){g.appendChild(el("div",{class:"gate s-"+(x.passed?"pass":"fail")},[el("i",{class:"dot"}),el("div",{},[el("b",{},[nice(x.name)]),el("span",{},[x.detail||""])])]));});
+      if(!(last.gates||[]).length)g.appendChild(el("p",{class:"empty"},["No gates were reached in this run."]));
+      app.appendChild(g);
+    }
+
+    app.appendChild(el("h2",{},["How a video moves through the studio",el("small",{},["each role reads the previous role's work"])]));
+    var flow=el("div",{class:"flow"});
+    var byRole={};((last&&last.stages)||[]).forEach(function(s){byRole[s.role]=s;});
+    ORDER.forEach(function(id,i){var s=byRole[id];flow.appendChild(chip(s?s.status:"idle",nice(id)));if(i<ORDER.length-1)flow.appendChild(document.createTextNode("→"));});
+    app.appendChild(el("div",{class:"card"},[flow]));
+
+    app.appendChild(el("h2",{},["The team",el("small",{},[roles.length+" roles"])]));
+    DEPTS.forEach(function(d){
+      var list=roles.filter(function(r){return r.dept===d;});if(!list.length)return;
+      app.appendChild(el("div",{class:"dept"},[d]));
+      var grid=el("div",{class:"desks"});
+      list.forEach(function(r){
+        var s=byRole[r.id];var st=s?s.status:(r.kind==="human"?"idle":"idle");
+        grid.appendChild(el("div",{class:"card desk"},[
+          el("div",{class:"name"},[el("span",{},[r.title]),chip(st,s?s.status:"idle")]),
+          el("div",{class:"kind"},[r.kind==="llm"?"AI model":r.kind==="human"?"you + Claude Code":"automated code"]),
+          el("div",{class:"job"},[r.summary]),
+          el("div",{class:"note"},[s&&s.note?s.note:"Waiting for the next run."])]));
+      });
+      app.appendChild(grid);
+    });
+
+    app.appendChild(el("h2",{},["Run history",el("small",{},["last "+Math.min(runs.length,20)])]));
+    if(!runs.length){app.appendChild(el("p",{class:"empty"},["Nothing yet."]));}
+    else{
+      var tb=el("tbody");
+      runs.slice().reverse().forEach(function(r){
+        var fails=(r.gates||[]).filter(function(x){return !x.passed;}).length;
+        var vid=r.video_id?el("a",{href:"https://youtu.be/"+encodeURIComponent(r.video_id),target:"_blank",rel:"noopener"},[r.title||r.video_id]):(r.title||r.topic||"-");
+        tb.appendChild(el("tr",{},[el("td",{},[when(r.started)]),el("td",{},[r.mode]),el("td",{},[chip(r.status,r.status)]),
+          el("td",{},[vid]),el("td",{},[(r.gates||[]).length?((r.gates.length-fails)+"/"+r.gates.length+" passed"):"-"])]));
+      });
+      var t=el("table",{},[el("thead",{},[el("tr",{},["When","Mode","Result","Video","Gates"].map(function(h){return el("th",{},[h]);}))]),tb]);
+      app.appendChild(el("div",{class:"card scroll"},[t]));
+    }
+    app.appendChild(el("footer",{},["Educational explainers built from public data (FRED, World Bank). Narration is AI-generated. Not financial advice."]));
+  }
+  Promise.all([load("roles.json"),load("state.json").catch(function(){return null;})])
+    .then(function(r){render(r[0],r[1]);})
+    .catch(function(e){var a=document.getElementById("app");a.textContent="";a.appendChild(el("p",{class:"empty"},["Couldn't load the studio board ("+e.message+")."]));});
+})();
+</script>
+</body>
+</html>

@@ -216,3 +216,29 @@ def test_live_run_publishes_and_records_history(studio_env, monkeypatch):
     assert run["status"] == "published" and run["video_id"] == "abc123XYZ"
     hist = json.loads((studio_env / "history.json").read_text())
     assert hist[-1]["id"] == "abc123XYZ" and list((studio_env / "library").glob("*.json"))
+
+
+# ---------- repo hygiene: board data and Claude Code roster stay valid ----------
+REPO = Path(__file__).resolve().parent.parent.parent
+
+
+def test_office_board_roles_match_the_registry():
+    from studio_lib.roles import ROLES
+    assert json.loads((REPO / "studio" / "roles.json").read_text()) == ROLES
+
+
+def test_claude_roster_files_have_valid_frontmatter():
+    files = sorted((REPO / ".claude" / "agents").glob("*.md"))
+    assert len(files) >= 8
+    for f in files:
+        text = f.read_text()
+        assert text.startswith("---\n"), f
+        head = text.split("---")[1]
+        fields = dict(line.split(":", 1) for line in head.strip().splitlines())
+        assert fields["name"].strip() == f.stem and fields["description"].strip() and fields["model"].strip() in ("haiku", "sonnet", "opus")
+
+
+def test_claude_md_states_the_hard_rules():
+    text = (REPO / "CLAUDE.md").read_text()
+    for needle in ("personal financial advice", "No role runs `git commit`", "secret values", "weakens a gate"):
+        assert needle.lower() in text.lower(), needle
