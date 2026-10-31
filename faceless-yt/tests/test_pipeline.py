@@ -4,6 +4,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pytest
 import pipeline as P
 
+@pytest.fixture(autouse=True)
+def _reset_provider_state():
+    P._dead_providers.clear()
+    yield
+    P._dead_providers.clear()
+
+
 SCRIPT = {"title": "T", "description": "D", "tags": [], "thumbnail_text": "STOP NOW",
           "scenes": [{"narration": f"Scene {i} words here for you.", "search_query": "money"} for i in range(P.CFG["scenes"])]}
 
@@ -170,3 +177,31 @@ def test_scene_clip_cuts_and_callout(tmp_path, monkeypatch):
     sc = {"narration": "x", "search_query": "a", "search_queries": ["a", "b", "c"], "callout": "$200/MONTH = $250K"}
     out = P.build_scene_clip(sc, 0, 14.0, tmp_path)
     assert used == ["a", "b", "c"] and out.exists() and abs(P.duration(out) - 14.0) < 0.5
+
+
+def test_rate_limit_wait_parsing():
+    assert P.rate_limit_wait("Groq 429 retry-after=12: x") == 13
+    assert abs(P.rate_limit_wait("Groq 429 retry-after=: ... Please try again in 3.4s. ") - 4.4) < 0.01
+    assert abs(P.rate_limit_wait("Groq 429 retry-after=: try again in 1m2.5s") - 63.5) < 0.01
+    assert P.rate_limit_wait("Groq 429 retry-after=: no hint") == 20
+    assert P.rate_limit_wait("Gemini 402 retry-after=: out of credit") is None
+    assert P.rate_limit_wait("Groq 500: boom") is None
+
+
+def test_llm_waits_on_429_and_skips_dead_provider(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "g"); monkeypatch.setenv("GROQ_API_KEY", "q")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    P._dead_providers.clear()
+    calls, sleeps = [], []
+    def gem(prompt, mt, key): calls.append("gemini"); raise ValueError("Gemini 402 retry-after=: prepay depleted")
+    state = {"n": 0}
+    def groq(prompt, mt, key):
+        calls.append("groq"); state["n"] += 1
+        if state["n"] < 3: raise ValueError("Groq 429 retry-after=2: tpm")
+        return "ok"
+    monkeypatch.setattr(P, "_gemini", gem); monkeypatch.setattr(P, "_groq", groq)
+    monkeypatch.setattr(P.time, "sleep", lambda s: sleeps.append(s))
+    assert P.llm("p") == "ok" and sleeps == [3, 3]
+    assert P.llm("p") == "ok"
+    assert calls.count("gemini") == 1  # 402 marked Gemini dead for the rest of the run
+    P._dead_providers.clear()
