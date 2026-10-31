@@ -1,0 +1,339 @@
+{
+  "updated": "2026-10-31T15:12:46+00:00",
+  "channel": "The Money Blueprint",
+  "roles": [
+    {
+      "id": "head_of_content",
+      "title": "Head of Content",
+      "dept": "Editorial",
+      "kind": "llm",
+      "summary": "Picks the next topic and angle from the idea backlog and what performed; owns the calendar."
+    },
+    {
+      "id": "researcher",
+      "title": "Researcher",
+      "dept": "Editorial",
+      "kind": "llm",
+      "summary": "Chooses which real public datasets answer the question and what to chart."
+    },
+    {
+      "id": "data_analyst",
+      "title": "Data Analyst",
+      "dept": "Editorial",
+      "kind": "code",
+      "summary": "Downloads FRED / World Bank data and writes the fact sheet: the only numbers a script may cite."
+    },
+    {
+      "id": "scriptwriter",
+      "title": "Scriptwriter",
+      "dept": "Editorial",
+      "kind": "llm",
+      "summary": "Writes the outline, then the script act by act, quoting only the fact sheet."
+    },
+    {
+      "id": "fact_checker",
+      "title": "Fact-checker",
+      "dept": "Standards",
+      "kind": "llm",
+      "summary": "Checks every claim against the fact sheet and flags anything doubtful."
+    },
+    {
+      "id": "policy_editor",
+      "title": "Policy Editor",
+      "dept": "Standards",
+      "kind": "llm",
+      "summary": "Enforces YouTube monetization rules: no advice, no expert persona, no hype or predictions."
+    },
+    {
+      "id": "originality_editor",
+      "title": "Originality Editor",
+      "dept": "Standards",
+      "kind": "code",
+      "summary": "Blocks repetitive or templated scripts and requires a real point of view."
+    },
+    {
+      "id": "director",
+      "title": "Director",
+      "dept": "Production",
+      "kind": "code",
+      "summary": "Assigns charts and concrete b-roll to scenes and checks pacing."
+    },
+    {
+      "id": "chart_designer",
+      "title": "Chart Designer",
+      "dept": "Production",
+      "kind": "code",
+      "summary": "Animates the real data into branded charts."
+    },
+    {
+      "id": "voice_actor",
+      "title": "Voice Actor",
+      "dept": "Production",
+      "kind": "code",
+      "summary": "Records the narration (free neural TTS) with word-accurate captions."
+    },
+    {
+      "id": "video_editor",
+      "title": "Video Editor",
+      "dept": "Production",
+      "kind": "code",
+      "summary": "Cuts footage, charts, callouts, music and captions into the final video."
+    },
+    {
+      "id": "thumbnail_designer",
+      "title": "Thumbnail Designer",
+      "dept": "Production",
+      "kind": "code",
+      "summary": "Builds the thumbnail from the best frame or an AI background."
+    },
+    {
+      "id": "publisher",
+      "title": "Publisher",
+      "dept": "Publishing & Growth",
+      "kind": "code",
+      "summary": "Writes chapters, sources and disclosure, then uploads."
+    },
+    {
+      "id": "producer",
+      "title": "Producer",
+      "dept": "Publishing & Growth",
+      "kind": "code",
+      "summary": "Final go / no-go: every gate must pass or nothing ships."
+    },
+    {
+      "id": "analyst",
+      "title": "Channel Analyst",
+      "dept": "Publishing & Growth",
+      "kind": "llm",
+      "summary": "Weekly review of views and retention; feeds the Head of Content."
+    },
+    {
+      "id": "ops",
+      "title": "Operations",
+      "dept": "Operations",
+      "kind": "code",
+      "summary": "Watches every run and opens an issue when something breaks."
+    },
+    {
+      "id": "boss",
+      "title": "Boss (you + Claude Code)",
+      "dept": "Operations",
+      "kind": "human",
+      "summary": "Sets priorities, owns secrets and approvals; dispatches the Claude Code roster to build and maintain the studio."
+    }
+  ],
+  "runs": [
+    {
+      "id": "20261031-142521",
+      "started": "2026-10-31T14:25:21+00:00",
+      "finished": "2026-10-31T14:27:40+00:00",
+      "mode": "dry-run",
+      "status": "blocked",
+      "title": null,
+      "topic": "The 2021 Inflation Surge: Causes and Mechanics",
+      "video_id": null,
+      "gates": [
+        {
+          "name": "real_data",
+          "passed": false,
+          "detail": "1 chart(s) from real data; skipped [\"us_inflation: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read\", \"us_m2: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read\", \"us_fed_funds: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): R"
+        }
+      ],
+      "stages": [
+        {
+          "role": "head_of_content",
+          "status": "done",
+          "note": "Why Did Prices Jump in 2021? The Data\u2011Driven Story",
+          "at": "2026-10-31T14:25:23+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "4 chart(s) planned",
+          "at": "2026-10-31T14:25:24+00:00"
+        },
+        {
+          "role": "data_analyst",
+          "status": "blocked",
+          "note": "US Real GDP Growth",
+          "at": "2026-10-31T14:27:40+00:00"
+        },
+        {
+          "role": "producer",
+          "status": "blocked",
+          "note": "not enough real data for a data-driven video",
+          "at": "2026-10-31T14:27:40+00:00"
+        }
+      ],
+      "note": "not enough real data for a data-driven video"
+    },
+    {
+      "id": "20261031-143410",
+      "started": "2026-10-31T14:34:10+00:00",
+      "finished": "2026-10-31T14:50:24+00:00",
+      "mode": "dry-run",
+      "status": "blocked",
+      "title": null,
+      "topic": "Why Did Inflation Spike in 2021-2022?",
+      "video_id": null,
+      "gates": [
+        {
+          "name": "real_data",
+          "passed": true,
+          "detail": "4 chart(s) from real data; skipped [\"us_inflation: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read\", \"us_m2: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read\", \"us_fed_funds: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): R"
+        },
+        {
+          "name": "structure",
+          "passed": false,
+          "detail": "only 862 words (need at least 1000 for a video long enough to carry mid-roll ads)"
+        }
+      ],
+      "stages": [
+        {
+          "role": "head_of_content",
+          "status": "done",
+          "note": "What Caused the 2021-2022 Inflation Surge?",
+          "at": "2026-10-31T14:34:12+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "4 chart(s) planned",
+          "at": "2026-10-31T14:34:13+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "only 1 chart(s) loaded; re-planning with World Bank data",
+          "at": "2026-10-31T14:50:09+00:00"
+        },
+        {
+          "role": "data_analyst",
+          "status": "done",
+          "note": "US Federal Debt\u2011to\u2011GDP, U.S. Inflation Rate 2000\u20112022, U.S. Broad Money (% of GDP) 2000\u20112022, U.S. Central Government Debt (% of GDP) 2000\u20112022",
+          "at": "2026-10-31T14:50:11+00:00"
+        },
+        {
+          "role": "scriptwriter",
+          "status": "done",
+          "note": "20 scenes, 862 words",
+          "at": "2026-10-31T14:50:24+00:00"
+        },
+        {
+          "role": "producer",
+          "status": "blocked",
+          "note": "script too thin: only 862 words (need at least 1000 for a video long enough to carry mid-roll ads)",
+          "at": "2026-10-31T14:50:24+00:00"
+        }
+      ],
+      "note": "script too thin: only 862 words (need at least 1000 for a video long enough to carry mid-roll ads)"
+    },
+    {
+      "id": "20261031-151026",
+      "started": "2026-10-31T15:10:26+00:00",
+      "finished": "2026-10-31T15:12:46+00:00",
+      "mode": "dry-run",
+      "status": "blocked",
+      "title": null,
+      "topic": "The 2021-2022 Inflation Surge: What the Data Really Shows",
+      "video_id": null,
+      "gates": [
+        {
+          "name": "real_data",
+          "passed": true,
+          "detail": "4 chart(s) from real data"
+        },
+        {
+          "name": "structure",
+          "passed": true,
+          "detail": "15 scenes, 1030 words"
+        },
+        {
+          "name": "numbers_and_facts",
+          "passed": false,
+          "detail": "1 unresolved issue(s): figure(s) not in the fact sheet: 2.6 %. Quote only fact-sheet numbers "
+        },
+        {
+          "name": "policy",
+          "passed": false,
+          "detail": "unresolved policy issues"
+        }
+      ],
+      "stages": [
+        {
+          "role": "head_of_content",
+          "status": "done",
+          "note": "Why Inflation Jumped in 2021-22 - A Data-Driven Story",
+          "at": "2026-10-31T15:10:29+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "4 chart(s) planned",
+          "at": "2026-10-31T15:10:46+00:00"
+        },
+        {
+          "role": "data_analyst",
+          "status": "done",
+          "note": "US Broad Money (% of GDP), US Consumer Inflation Rate, US Unemployment Rate, US Real GDP Growth",
+          "at": "2026-10-31T15:10:50+00:00"
+        },
+        {
+          "role": "scriptwriter",
+          "status": "done",
+          "note": "15 scenes, 1030 words",
+          "at": "2026-10-31T15:11:04+00:00"
+        },
+        {
+          "role": "fact_checker",
+          "status": "done",
+          "note": "round 1: 1 issue(s)",
+          "at": "2026-10-31T15:11:47+00:00"
+        },
+        {
+          "role": "policy_editor",
+          "status": "done",
+          "note": "round 1: 0 issue(s), 2 automatic flag(s)",
+          "at": "2026-10-31T15:11:50+00:00"
+        },
+        {
+          "role": "fact_checker",
+          "status": "done",
+          "note": "round 2: 1 issue(s)",
+          "at": "2026-10-31T15:12:10+00:00"
+        },
+        {
+          "role": "policy_editor",
+          "status": "done",
+          "note": "round 2: 0 issue(s), 1 automatic flag(s)",
+          "at": "2026-10-31T15:12:13+00:00"
+        },
+        {
+          "role": "fact_checker",
+          "status": "done",
+          "note": "round 3: 0 issue(s)",
+          "at": "2026-10-31T15:12:46+00:00"
+        },
+        {
+          "role": "policy_editor",
+          "status": "done",
+          "note": "round 3: 0 issue(s), 1 automatic flag(s)",
+          "at": "2026-10-31T15:12:46+00:00"
+        },
+        {
+          "role": "producer",
+          "status": "blocked",
+          "note": "script did not pass fact-check and policy review after 2 revisions",
+          "at": "2026-10-31T15:12:46+00:00"
+        },
+        {
+          "role": "ops",
+          "status": "done",
+          "note": "run blocked: script did not pass fact-check and policy review after 2 revisions",
+          "at": "2026-10-31T15:12:46+00:00"
+        }
+      ],
+      "note": "script did not pass fact-check and policy review after 2 revisions"
+    }
+  ]
+}
