@@ -1,0 +1,25 @@
+{
+  "format": "long",
+  "privacy": "public",
+  "category_id": "28",
+  "affiliate_links": [],
+  "ai_thumbnails": true,
+  "audience": "English-speaking viewers mainly in the US, UK, Canada, Australia and India; explain jargon the first time it appears",
+  "status": "scaffold: source adapters not built yet",
+  "channel": "TBD (see docs/NAMES.md)",
+  "niche": "the biggest AI developments of the last 24 hours (models, research, tools, policy) explained in plain language with what each one means",
+  "tone": "clear, grounded, no hype or doom; separates confirmed from rumoured",
+  "scenes": 12,
+  "voice": "en-US-AriaNeural",
+  "cadence": "daily",
+  "min_minutes": 5,
+  "min_words": 800,
+  "window_hours": 24,
+  "sources": [
+    "official lab and company blogs (RSS)",
+    "arXiv cs.AI / cs.LG",
+    "Hugging Face daily papers",
+    "Hacker News and GitHub trending (signal only)"
+  ],
+  "verification": "claims come from a primary source (the lab's own post or the paper) or 2 outlets agreeing; benchmark numbers, dates and prices must appear in the source; rumours are cut or labelled unconfirmed"
+}

@@ -1,0 +1,17 @@
+{
+  "niche": "how money and the economy work, explained with real public data (inflation, interest rates, money supply, debt, jobs, housing); educational explainers, never personal financial advice",
+  "tone": "calm, curious, clear storytelling in plain language; precise numbers taken only from the supplied data; no hype, no instructions to the viewer about their money",
+  "format": "long",
+  "scenes": 18,
+  "voice": "en-US-AndrewNeural",
+  "privacy": "public",
+  "category_id": "27",
+  "affiliate_links": [],
+  "channel": "The Money Blueprint (@MoneyBlueprintWithSri)",
+  "audience": "English-speaking viewers mainly in the US, UK, Canada and Australia; USD unless a chart is about another country; explain jargon the first time it appears",
+  "ai_thumbnails": true,
+  "min_minutes": 6,
+  "min_words": 1000,
+  "cadence": "Mon/Wed/Fri",
+  "status": "live"
+}

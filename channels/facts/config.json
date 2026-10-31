@@ -1,0 +1,24 @@
+{
+  "format": "long",
+  "privacy": "public",
+  "category_id": "27",
+  "affiliate_links": [],
+  "ai_thumbnails": true,
+  "audience": "English-speaking viewers mainly in the US, UK, Canada, Australia and India; explain jargon the first time it appears",
+  "status": "scaffold: source adapters not built yet",
+  "channel": "TBD (see docs/NAMES.md)",
+  "niche": "surprising, well-sourced facts about science, history, nature, the human body and everyday things ('did you know'); every fact has a named primary source and is explained, not just listed",
+  "tone": "curious, upbeat, clear; wonder without hype; no clickbait claims",
+  "scenes": 18,
+  "voice": "en-GB-RyanNeural",
+  "cadence": "3-4 per week (start), build up with watch time",
+  "min_minutes": 6,
+  "min_words": 1000,
+  "sources": [
+    "Wikipedia / Wikidata",
+    "NASA, NOAA, USGS open data",
+    "Smithsonian and museum open collections",
+    "peer-reviewed press releases (EurekAlert, PubMed abstracts)"
+  ],
+  "verification": "each fact needs a named primary source or 2 independent sources; no numbers or dates beyond the fact sheet"
+}

@@ -1,0 +1,24 @@
+{
+  "format": "long",
+  "privacy": "public",
+  "category_id": "25",
+  "affiliate_links": [],
+  "ai_thumbnails": true,
+  "audience": "English-speaking viewers mainly in the US, UK, Canada, Australia and India; explain jargon the first time it appears",
+  "status": "scaffold: source adapters not built yet",
+  "channel": "TBD (see docs/NAMES.md)",
+  "niche": "one neutral evening briefing of the most important world stories from the last 24 hours, about 5 minutes, strictly verified",
+  "tone": "calm, neutral, factual; no opinions, no predictions, no sensational language; 'reported by' attribution",
+  "scenes": 10,
+  "voice": "en-US-GuyNeural",
+  "cadence": "daily, evening (time zone to be set)",
+  "min_minutes": 4.5,
+  "min_words": 700,
+  "window_hours": 24,
+  "sources": [
+    "BBC, Guardian, NPR, Al Jazeera, DW (RSS)",
+    "GDELT",
+    "Wikipedia Current Events"
+  ],
+  "verification": "a story is included only if 2+ independent outlets report it within the window; every claim traces to the fact sheet; own wording, no outlet footage or images; sources credited in the description"
+}
