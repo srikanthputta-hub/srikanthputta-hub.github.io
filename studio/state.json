@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-31T14:27:40+00:00",
+  "updated": "2026-10-31T14:50:24+00:00",
   "channel": "The Money Blueprint",
   "roles": [
     {
@@ -166,6 +166,67 @@
         }
       ],
       "note": "not enough real data for a data-driven video"
+    },
+    {
+      "id": "20261031-143410",
+      "started": "2026-10-31T14:34:10+00:00",
+      "finished": "2026-10-31T14:50:24+00:00",
+      "mode": "dry-run",
+      "status": "blocked",
+      "title": null,
+      "topic": "Why Did Inflation Spike in 2021-2022?",
+      "video_id": null,
+      "gates": [
+        {
+          "name": "real_data",
+          "passed": true,
+          "detail": "4 chart(s) from real data; skipped [\"us_inflation: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read\", \"us_m2: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read\", \"us_fed_funds: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): R"
+        },
+        {
+          "name": "structure",
+          "passed": false,
+          "detail": "only 862 words (need at least 1000 for a video long enough to carry mid-roll ads)"
+        }
+      ],
+      "stages": [
+        {
+          "role": "head_of_content",
+          "status": "done",
+          "note": "What Caused the 2021-2022 Inflation Surge?",
+          "at": "2026-10-31T14:34:12+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "4 chart(s) planned",
+          "at": "2026-10-31T14:34:13+00:00"
+        },
+        {
+          "role": "researcher",
+          "status": "done",
+          "note": "only 1 chart(s) loaded; re-planning with World Bank data",
+          "at": "2026-10-31T14:50:09+00:00"
+        },
+        {
+          "role": "data_analyst",
+          "status": "done",
+          "note": "US Federal Debt\u2011to\u2011GDP, U.S. Inflation Rate 2000\u20112022, U.S. Broad Money (% of GDP) 2000\u20112022, U.S. Central Government Debt (% of GDP) 2000\u20112022",
+          "at": "2026-10-31T14:50:11+00:00"
+        },
+        {
+          "role": "scriptwriter",
+          "status": "done",
+          "note": "20 scenes, 862 words",
+          "at": "2026-10-31T14:50:24+00:00"
+        },
+        {
+          "role": "producer",
+          "status": "blocked",
+          "note": "script too thin: only 862 words (need at least 1000 for a video long enough to carry mid-roll ads)",
+          "at": "2026-10-31T14:50:24+00:00"
+        }
+      ],
+      "note": "script too thin: only 862 words (need at least 1000 for a video long enough to carry mid-roll ads)"
     }
   ]
 }
