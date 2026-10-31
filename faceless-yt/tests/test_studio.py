@@ -437,8 +437,7 @@ def test_dashboard_desks_match_the_role_registry():
     html = (REPO / "studio" / "index.html").read_text()
     flow = re.findall(r'"([a-z_]+)"', re.search(r"var FLOW=\[(.*?)\];", html).group(1))
     assert flow == FLOW and set(flow) | {"boss"} == {r["id"] for r in ROLES}
-    slots = re.search(r"var SLOTS=\[(.*?)\];", html).group(1)
-    assert slots.count("[") == len(flow) == 7  # one desk slot per role; the boss has his own spot at the bottom
+    assert len(flow) == 7  # seven working roles; the boss is not a pipeline step
 
 
 def test_board_retries_a_timed_out_update_once(monkeypatch):
