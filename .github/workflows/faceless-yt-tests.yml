@@ -1,0 +1,17 @@
+name: Faceless YouTube tests
+on:
+  pull_request:
+    paths: ["faceless-yt/**"]
+  push:
+    branches-ignore: [main]
+    paths: ["faceless-yt/**"]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: faceless-yt/requirements.txt }
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - run: pip install -r faceless-yt/requirements.txt pytest
+      - run: python -m pytest -q faceless-yt/tests

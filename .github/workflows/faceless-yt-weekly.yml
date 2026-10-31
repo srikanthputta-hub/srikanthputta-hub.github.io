@@ -1,0 +1,36 @@
+name: Faceless YouTube weekly
+on:
+  schedule:
+    - cron: "43 5 * * 1"   # Mondays
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "plan = write STRATEGY.md, otherwise ideas + review"
+        type: choice
+        options: [ideas-and-review, plan]
+        default: ideas-and-review
+permissions:
+  contents: write
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: faceless-yt/requirements.txt }
+      - run: pip install -r faceless-yt/requirements.txt
+      - name: Run strategy tasks
+        working-directory: faceless-yt
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+        run: |
+          if [ "${{ inputs.task }}" = "plan" ]; then python strategy.py plan
+          else python strategy.py ideas && python strategy.py review; fi
+      - name: Commit results
+        run: |
+          git config user.name "yt-bot" && git config user.email "yt-bot@users.noreply.github.com"
+          git add faceless-yt/ideas.json faceless-yt/history.json faceless-yt/STRATEGY.md faceless-yt/REVIEW.md
+          (git commit -m "Weekly strategy update" && git push) || true
