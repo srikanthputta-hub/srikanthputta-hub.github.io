@@ -56,7 +56,7 @@ def _gemini(prompt, max_tokens, key):
         json={"contents": [{"parts": [{"text": prompt}]}],
               "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}})
     if not r.ok:
-        raise ValueError(f"Gemini {r.status_code}: {r.text[:300]}")
+        raise ValueError(f"Gemini {r.status_code} retry-after={r.headers.get('retry-after', '')}: {r.text[:600]}")
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 
@@ -93,7 +93,7 @@ def _groq(prompt, max_tokens, key):
                       json={"model": model, "max_tokens": min(max_tokens, 8000), "temperature": 0.8,
                             "messages": [{"role": "user", "content": prompt}]})
     if not r.ok:
-        raise ValueError(f"Groq {r.status_code}: {r.text[:300]}")
+        raise ValueError(f"Groq {r.status_code} retry-after={r.headers.get('retry-after', '')}: {r.text[:600]}")
     return r.json()["choices"][0]["message"]["content"]
 
 
@@ -104,8 +104,26 @@ def _claude(prompt, max_tokens, key):
     return m.content[0].text
 
 
+_dead_providers = set()
+
+
+def rate_limit_wait(msg):
+    """Seconds to wait if this provider error is a 429 rate limit, else None."""
+    if not re.match(r"\w+ 429", msg):
+        return None
+    ra = re.search(r"retry-after=([\d.]+)", msg)
+    if ra:
+        return min(float(ra.group(1)) + 1, 70)
+    t = re.search(r"try again in (?:(\d+)m)?([\d.]+)(ms|s)", msg)
+    if t:
+        secs = float(t.group(2)) / (1000 if t.group(3) == "ms" else 1) + 60 * int(t.group(1) or 0)
+        return min(secs + 1, 70)
+    return 20
+
+
 def llm(prompt, max_tokens=6000):
-    """Tries every provider that has a key, free ones first: Gemini, Groq, then Claude (paid, optional)."""
+    """Tries every provider that has a key, free ones first: Gemini, Groq, then Claude (paid, optional).
+    Rate limits (429) wait and retry the same provider; out-of-credit/auth errors skip it for the rest of the run."""
     providers = [(n, f, os.environ.get(k)) for n, f, k in
                  (("Gemini", _gemini, "GEMINI_API_KEY"), ("Groq", _groq, "GROQ_API_KEY"),
                   ("Claude", _claude, "ANTHROPIC_API_KEY")) if os.environ.get(k)]
@@ -113,12 +131,24 @@ def llm(prompt, max_tokens=6000):
         raise RuntimeError("No LLM key found: set GEMINI_API_KEY or GROQ_API_KEY (both free), or ANTHROPIC_API_KEY (paid)")
     errors = []
     for name, fn, key in providers:
-        try:
-            return fn(prompt, max_tokens, key)
-        except Exception as e:
-            print(f"{name} failed, trying next provider: {str(e)[:200]}")
-            errors.append(f"{name}: {str(e)[:200]}")
-    raise ValueError("all LLM providers failed: " + " | ".join(errors))
+        if name in _dead_providers:
+            continue
+        for attempt in range(4):
+            try:
+                return fn(prompt, max_tokens, key)
+            except Exception as e:
+                msg = str(e)
+                wait = rate_limit_wait(msg)
+                if wait is not None and attempt < 3:
+                    print(f"{name} rate limited; waiting {wait:.0f}s then retrying")
+                    time.sleep(wait)
+                    continue
+                if re.match(r"\w+ (401|402|403)", msg):
+                    _dead_providers.add(name)  # no credit / bad key: don't waste calls on it again this run
+                print(f"{name} failed, trying next provider: {msg[:200]}")
+                errors.append(f"{name}: {msg[:200]}")
+                break
+    raise ValueError("all LLM providers failed: " + (" | ".join(errors) or "every provider was skipped"))
 
 
 def sh(*cmd):
