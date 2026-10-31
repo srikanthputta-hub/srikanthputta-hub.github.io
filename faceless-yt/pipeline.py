@@ -316,6 +316,38 @@ async def _tts(text, path):
     return words
 
 
+def clean_for_tts(text):
+    """Plain, speakable text: no emoji/markup, ASCII-ish punctuation, single spaces."""
+    text = (text.replace("\u2018", "'").replace("\u2019", "'").replace("\u201c", '"').replace("\u201d", '"')
+                .replace("\u2011", "-").replace("\u2013", "-").replace("\u2014", ", ").replace("\u2026", "..."))
+    text = re.sub(r"[*_#`~^|<>\[\]{}]", "", text)
+    text = re.sub(r"[^\x00-\x7F]", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+FALLBACK_VOICE = "en-US-GuyNeural"
+
+
+def tts_with_retry(text, path, tries=5):
+    """edge-tts is a free web service and occasionally returns no audio; retry with backoff, then another voice."""
+    text = clean_for_tts(text)
+    last = None
+    for attempt in range(tries):
+        try:
+            words = asyncio.run(_tts(text, path))
+            if Path(path).exists() and Path(path).stat().st_size > 1000:
+                return words
+            last = RuntimeError("empty audio file")
+        except Exception as e:
+            last = e
+        print(f"TTS attempt {attempt + 1}/{tries} failed: {str(last)[:120]}")
+        time.sleep(3 * (attempt + 1))
+        if attempt == tries - 2 and CFG["voice"] != FALLBACK_VOICE:
+            CFG["voice"] = FALLBACK_VOICE
+            print("switching to fallback voice", FALLBACK_VOICE)
+    raise RuntimeError(f"text-to-speech failed after {tries} tries: {last}")
+
+
 # ---------- 3. footage ----------
 USED_CLIPS = set()
 
@@ -451,7 +483,7 @@ def render(script):
     clips, audios, durs, timings = [], [], [], []
     for i, sc in enumerate(script["scenes"]):
         a = work / f"a{i}.mp3"
-        timings.append(asyncio.run(_tts(sc["narration"], a)))
+        timings.append(tts_with_retry(sc["narration"], a))
         d = duration(a) + 0.25
         v = build_scene_clip(sc, i, d, work)
         audios.append(a); clips.append(v); durs.append(d)

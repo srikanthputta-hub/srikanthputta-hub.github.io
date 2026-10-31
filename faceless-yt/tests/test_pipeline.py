@@ -213,3 +213,30 @@ def test_missing_youtube_secrets_named_clearly(monkeypatch):
     monkeypatch.setenv("YT_REFRESH_TOKEN", "")
     with pytest.raises(RuntimeError, match="YT_CLIENT_SECRET, YT_REFRESH_TOKEN"):
         P.yt_client()
+
+
+def test_clean_for_tts():
+    assert P.clean_for_tts("It\u2019s a \u201cbig\u201d deal \u2014 really \U0001F4B0 **now**") == 'It\'s a "big" deal , really now'
+
+
+def test_tts_retries_then_succeeds(tmp_path, monkeypatch):
+    monkeypatch.setattr(P.time, "sleep", lambda s: None)
+    n = {"c": 0}
+    async def flaky(text, path):
+        n["c"] += 1
+        if n["c"] < 3:
+            raise RuntimeError("No audio was received")
+        Path(path).write_bytes(b"x" * 2000)
+        return [("hi", 0.0, 0.2)]
+    monkeypatch.setattr(P, "_tts", flaky)
+    assert P.tts_with_retry("hi", tmp_path / "a.mp3") == [("hi", 0.0, 0.2)] and n["c"] == 3
+
+
+def test_tts_gives_up_with_clear_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(P.time, "sleep", lambda s: None)
+    monkeypatch.setitem(P.CFG, "voice", "en-US-AndrewNeural")
+    async def dead(text, path): raise RuntimeError("No audio was received")
+    monkeypatch.setattr(P, "_tts", dead)
+    with pytest.raises(RuntimeError, match="text-to-speech failed after 5 tries"):
+        P.tts_with_retry("hi", tmp_path / "a.mp3")
+    assert P.CFG["voice"] == "en-US-GuyNeural"
