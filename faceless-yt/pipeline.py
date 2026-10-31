@@ -5,7 +5,7 @@ Usage:
   python pipeline.py --dry-run      # everything except upload; footage replaced by gradients if no PEXELS_API_KEY
   python pipeline.py                # full run, uploads to YouTube
 """
-import argparse, asyncio, json, os, random, re, subprocess, sys, time
+import argparse, asyncio, json, os, random, re, subprocess, sys, time, urllib.parse
 from pathlib import Path
 
 import requests
@@ -211,8 +211,10 @@ Already published (do not repeat): {past[-40:]}{perf}{assigned}{assigned}
 Pick one fresh, specific, factually solid topic and write the video. Only state facts you are confident are true. Pick topics people actually search for (e.g. "how X works", "X vs Y", "mistakes to avoid"). Use rounded illustrative examples, never claim guaranteed returns, no specific stock/crypto picks. Title must promise a concrete payoff; description must start with the main keyword and end with "This video is educational, not financial advice."
 Retention rules: scene 1 hooks within 5 seconds (a surprising number, a bold claim or a relatable problem; never 'in this video'), then opens a loop it pays off later. Every 2-3 scenes add a pattern interrupt (a question, a contrast, a concrete example). Deliver real value, with specific numbers and steps, not filler. The last scene gives a payoff recap and a one-line subscribe call to action.
 Return ONLY JSON:
-{{"title": "<=70 chars, curiosity-driven", "description": "2-3 sentences + hashtags", "tags": ["..."], "thumbnail_text": "2-4 punchy words, ALL CAPS, no punctuation",
- "scenes": [{{"narration": "{sent}", "search_query": "2-4 word stock-footage search, concrete visuals"}}]}}
+{{"title": "<=70 chars, curiosity-driven", "description": "2-3 sentences + hashtags", "tags": ["..."], "thumbnail_text": "2-4 punchy words, ALL CAPS, no punctuation", "thumbnail_prompt": "one vivid background image idea for the thumbnail: a simple concrete subject, strong colour contrast, no text, no faces",
+ "scenes": [{{"narration": "{sent}", "search_queries": ["3 different stock-footage searches for this scene"], "callout": "on-screen text or empty string"}}]}}
+search_queries rules: concrete, FILMABLE subjects only: real people, places, objects and actions (e.g. "woman counting cash at kitchen table", "city skyline at night", "hands typing on laptop"). Never abstract ideas, symbols, charts, graphics or animations.
+callout rules: for about half the scenes, a punchy on-screen phrase of at most 5 words that carries the key number or term (e.g. "$200/MONTH = $250K", "RULE OF 72", "AVOID THIS TRAP"); otherwise "".
 Exactly {n} scenes."""
     script = ask_json(prompt, CFG["scenes"])
     return fact_check(script)
@@ -226,7 +228,11 @@ def ask_json(prompt, n_scenes=None, tries=3):
             text = llm(prompt)
             data = json.loads(text[text.index("{"): text.rindex("}") + 1])
             scenes = data["scenes"]
-            assert all(s.get("narration") and s.get("search_query") for s in scenes), "empty scene field"
+            for s in scenes:
+                qs = s.get("search_queries") or ([s["search_query"]] if s.get("search_query") else [])
+                assert s.get("narration") and qs, "empty scene field"
+                s["search_queries"] = [q for q in qs if q][:4]
+                s["search_query"] = s["search_queries"][0]
             assert data.get("title") and data.get("description"), "missing title/description"
             if n_scenes:
                 assert abs(len(scenes) - n_scenes) <= 2, f"got {len(scenes)} scenes"
@@ -324,13 +330,64 @@ def fetch_clip(query, dest, seconds):
         raw.write_bytes(requests.get(url, timeout=120).content)
         sh("ffmpeg", "-y", "-stream_loop", "-1", "-i", raw, "-t", seconds, "-an",
            "-vf", f"scale={SIZE[0]}:{SIZE[1]}:force_original_aspect_ratio=increase,"
-                  f"crop={SIZE[0]}:{SIZE[1]},fps=30,setsar=1",
+                  f"crop={SIZE[0]}:{SIZE[1]},fps=30,setsar=1,eq=contrast=1.06:saturation=1.15",
            "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", dest)
         return
     # fallback: animated gradient so the pipeline always completes
     sh("ffmpeg", "-y", "-f", "lavfi", "-i",
        f"gradients=s={SIZE[0]}x{SIZE[1]}:d={seconds}:speed=0.02:r=30", "-c:v", "libx264",
        "-preset", "veryfast", "-pix_fmt", "yuv420p", dest)
+
+
+_font_cache = {}
+
+
+def find_font():
+    """Heaviest Montserrat if installed (workflow installs it), else DejaVu Sans Bold."""
+    if "f" not in _font_cache:
+        path = None
+        for q in ("Montserrat:style=ExtraBold", "Montserrat:bold", "DejaVu Sans:bold"):
+            try:
+                out = subprocess.run(["fc-match", "-f", "%{file}", q], capture_output=True, text=True).stdout.strip()
+            except FileNotFoundError:
+                break
+            if out and os.path.exists(out):
+                path = out
+                break
+        _font_cache["f"] = path or ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+                                    if os.path.exists("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf") else None)
+    return _font_cache["f"]
+
+
+def build_scene_clip(sc, i, d, work):
+    """One scene = several short cuts (~5s) from different searches, optional animated on-screen callout."""
+    queries = sc.get("search_queries") or [sc["search_query"]]
+    seg = 5.0 if CFG["format"] == "long" else 3.5
+    n = max(1, round(d / seg))
+    parts, left = [], d
+    for k in range(n):
+        length = left / (n - k)
+        left -= length
+        part = work / f"v{i}_{k}.mp4"
+        fetch_clip(queries[k % len(queries)], part, length)
+        parts.append(part)
+    listing = work / f"p{i}.txt"
+    listing.write_text("".join(f"file '{q.resolve()}'\n" for q in parts))
+    scene = work / f"v{i}.mp4"
+    callout = (sc.get("callout") or "").strip()
+    base = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", listing]
+    if not callout:
+        sh(*base, "-c", "copy", scene)
+        return scene
+    tf = work / f"c{i}.txt"
+    tf.write_text(callout.upper())
+    show = min(4.5, d)
+    fs = SIZE[1] // (22 if CFG["format"] == "short" else 13)
+    font = f"fontfile={find_font()}:" if find_font() else ""
+    dt = (f"drawtext={font}textfile={tf}:fontsize={fs}:fontcolor=0xF5B82E:box=1:boxcolor=0x0B1F3A@0.80:boxborderw={fs // 3}:"
+          f"x=(w-text_w)/2:y=h*0.13:alpha='if(lt(t,0.3),t/0.3,if(lt(t,{show - 0.5:.2f}),1,max(0,({show:.2f}-t)/0.5)))'")
+    sh(*base, "-vf", dt, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", scene)
+    return scene
 
 
 # ---------- 4. captions ----------
@@ -362,17 +419,16 @@ def render(script):
         a = work / f"a{i}.mp3"
         timings.append(asyncio.run(_tts(sc["narration"], a)))
         d = duration(a) + 0.25
-        v = work / f"v{i}.mp4"
-        fetch_clip(sc["search_query"], v, d)
+        v = build_scene_clip(sc, i, d, work)
         audios.append(a); clips.append(v); durs.append(d)
-        print(f"scene {i + 1}: {d:.1f}s  [{sc['search_query']}]")
+        print(f"scene {i + 1}: {d:.1f}s  {sc['search_queries']}" + (f"  callout: {sc['callout']}" if sc.get("callout") else ""))
     (work / "v.txt").write_text("".join(f"file '{c.resolve()}'\n" for c in clips))
     (work / "a.txt").write_text("".join(f"file '{a.resolve()}'\n" for a in audios))
     srt = work / "captions.srt"
     srt.write_text(build_srt(timings, durs))
     final = OUT / "video.mp4"
     size = 14 if CFG["format"] == "short" else 12
-    style = (f"FontName=DejaVu Sans,Bold=1,FontSize={size * 2},PrimaryColour=&H00FFFFFF,"
+    style = (f"FontName=Montserrat,Bold=1,FontSize={size * 2},PrimaryColour=&H00FFFFFF,"
              f"OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=" +
              ("260" if CFG["format"] == "short" else "60"))
     tracks = sorted((HERE / "music").glob("*.mp3")) if (HERE / "music").exists() else []
@@ -391,30 +447,92 @@ def render(script):
 
 
 # ---------- 5b. thumbnail ----------
-def make_thumbnail(video, text):
-    from PIL import Image, ImageDraw, ImageEnhance, ImageFont
-    frame = OUT / "frame.jpg"
-    sh("ffmpeg", "-y", "-ss", "1", "-i", OUT / "work" / "v0.mp4", "-frames:v", "1", frame)  # raw clip: no burned-in captions
-    img = Image.open(frame).convert("RGB")
-    W, H = 1280, 720
-    scale = max(W / img.width, H / img.height)
-    img = img.resize((int(img.width * scale), int(img.height * scale)))
-    img = img.crop(((img.width - W) // 2, (img.height - H) // 2, (img.width + W) // 2, (img.height + H) // 2))
-    img = ImageEnhance.Brightness(ImageEnhance.Color(img).enhance(1.4)).enhance(0.55)
-    d = ImageDraw.Draw(img)
-    font_path = next((f for f in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"] if os.path.exists(f)), None)
+def ai_background(prompt):
+    """Optional free AI-generated background (Pollinations); None on any problem so stock frames are used instead."""
+    if not prompt or not CFG.get("ai_thumbnails", True):
+        return None
+    from PIL import Image
+    try:
+        url = ("https://image.pollinations.ai/prompt/" + urllib.parse.quote(prompt + ", cinematic lighting, vibrant colors, no text, no watermark")
+               + "?width=1280&height=720&nologo=true")
+        r = requests.get(url, timeout=90)
+        if r.ok and r.headers.get("content-type", "").startswith("image") and len(r.content) > 20000:
+            path = OUT / "ai_bg.jpg"
+            path.write_bytes(r.content)
+            Image.open(path).verify()
+            return path
+    except Exception as e:
+        print("AI background skipped:", e)
+    return None
+
+
+def best_frame():
+    """Pick the most colourful, highest-contrast frame among the raw (caption-free) scene clips."""
+    from PIL import Image, ImageStat
+    best, best_score = None, -1
+    for clip in sorted((OUT / "work").glob("v*_0.mp4")) or sorted((OUT / "work").glob("v[0-9]*.mp4")):
+        f = OUT / f"cand_{clip.stem}.jpg"
+        sh("ffmpeg", "-y", "-ss", "1", "-i", clip, "-frames:v", "1", f)
+        img = Image.open(f).convert("RGB").resize((160, 90))
+        stat = ImageStat.Stat(img)
+        r, g, b = stat.mean
+        score = sum(stat.stddev) + 0.5 * (abs(r - g) + abs(g - b) + abs(b - r)) - (60 if sum(stat.mean) / 3 < 45 else 0)
+        if score > best_score:
+            best, best_score = f, score
+    return best
+
+
+def layout_text(text, font_path, max_w=720, max_lines=3):
+    from PIL import ImageFont
     words = text.upper().split()
-    lines = [" ".join(words[:2]), " ".join(words[2:])] if len(words) > 2 else [" ".join(words)]
-    lines = [l for l in lines if l]
-    size = 190 if max(len(l) for l in lines) <= 9 else 140
-    font = ImageFont.truetype(font_path, size) if font_path else ImageFont.load_default()
-    y = (H - len(lines) * (size + 20)) // 2
+    for size in range(200, 80, -10):
+        font = ImageFont.truetype(font_path, size) if font_path else ImageFont.load_default()
+        lines, cur = [], ""
+        for w in words:
+            t = (cur + " " + w).strip()
+            if font.getlength(t) <= max_w or not cur:
+                cur = t
+            else:
+                lines.append(cur)
+                cur = w
+        lines.append(cur)
+        if len(lines) <= max_lines and max(font.getlength(l) for l in lines) <= max_w:
+            break
+    return font, size, lines
+
+
+def make_thumbnail(video, text, prompt=None):
+    from PIL import Image, ImageDraw, ImageEnhance, ImageOps
+    src = ai_background(prompt) or best_frame()
+    W, H = 1280, 720
+    img = Image.open(src).convert("RGB")
+    scale = max(W / img.width, H / img.height)
+    img = img.resize((int(img.width * scale) + 1, int(img.height * scale) + 1))
+    img = img.crop(((img.width - W) // 2, (img.height - H) // 2, (img.width + W) // 2, (img.height + H) // 2))
+    img = ImageEnhance.Contrast(ImageEnhance.Color(img).enhance(1.35)).enhance(1.12)
+    # dark ramp on the left so text pops, subject stays visible on the right
+    ramp = ImageOps.invert(Image.linear_gradient("L").rotate(90).resize((W, H)))
+    alpha = ramp.point(lambda v: int(max(0.0, min(1.0, (v / 255 - 0.30) / 0.70)) * 0.92 * 255))
+    img = Image.composite(Image.new("RGB", (W, H), (6, 14, 30)), img, alpha)
+    d = ImageDraw.Draw(img)
+    font, size, lines = layout_text(text, find_font())
+    gap = int(size * 0.12)
+    total = len(lines) * size + (len(lines) - 1) * gap
+    y = (H - total) // 2 - 10
+    hot = [i for i, l in enumerate(lines) if any(c.isdigit() or c in "$%" for c in l)] or [len(lines) - 1]
     for i, l in enumerate(lines):
-        w = d.textlength(l, font=font)
-        color = "#FFD400" if i == len(lines) - 1 else "white"
-        d.text(((W - w) / 2, y + i * (size + 20)), l, font=font, fill=color, stroke_width=10, stroke_fill="black")
+        x, yy = 60, y + i * (size + gap)
+        d.text((x + 6, yy + 7), l, font=font, fill=(0, 0, 0), stroke_width=9, stroke_fill=(0, 0, 0))
+        d.text((x, yy), l, font=font, fill="#FFD400" if i in hot else "white", stroke_width=9, stroke_fill="black")
+    d.rounded_rectangle([60, y + total + 26, 60 + 260, y + total + 40], radius=7, fill="#FFD400")
+    logo_path = HERE / "branding" / "logo.png"
+    if logo_path.exists():  # channel logo, bottom-right, circular
+        logo = Image.open(logo_path).convert("RGB").resize((150, 150))
+        mask = Image.new("L", (150, 150), 0)
+        ImageDraw.Draw(mask).ellipse([0, 0, 149, 149], fill=255)
+        img.paste(logo, (W - 190, H - 190), mask)
     out = OUT / "thumbnail.jpg"
-    img.save(out, quality=90)
+    img.save(out, quality=92)
     return out
 
 
@@ -451,7 +569,7 @@ def main():
     script = write_script(history, idea)
     print("Title:", script["title"])
     video = render(script)
-    thumb = make_thumbnail(video, script.get("thumbnail_text") or script["title"][:24])
+    thumb = make_thumbnail(video, script.get("thumbnail_text") or script["title"][:24], script.get("thumbnail_prompt"))
     (OUT / "script.json").write_text(json.dumps(script, indent=2))
     if args.dry_run:
         print("dry run complete:", video, thumb)
