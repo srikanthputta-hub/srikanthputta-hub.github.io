@@ -185,11 +185,15 @@ def mark_used(title):
 
 
 def yt_client():
+    missing = [k for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN") if not os.environ.get(k)]
+    if missing:
+        raise RuntimeError("GitHub secret(s) missing or empty: " + ", ".join(missing) +
+                           ". Add them under Settings > Secrets and variables > Actions > Repository secrets (exact names).")
     from google.auth.exceptions import RefreshError
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
-    creds = Credentials(None, refresh_token=os.environ["YT_REFRESH_TOKEN"],
+    creds = Credentials(None, refresh_token=os.environ["YT_REFRESH_TOKEN"].strip(),
                         client_id=os.environ["YT_CLIENT_ID"], client_secret=os.environ["YT_CLIENT_SECRET"],
                         token_uri="https://oauth2.googleapis.com/token")
     try:

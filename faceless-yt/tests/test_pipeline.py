@@ -205,3 +205,11 @@ def test_llm_waits_on_429_and_skips_dead_provider(monkeypatch):
     assert P.llm("p") == "ok"
     assert calls.count("gemini") == 1  # 402 marked Gemini dead for the rest of the run
     P._dead_providers.clear()
+
+
+def test_missing_youtube_secrets_named_clearly(monkeypatch):
+    monkeypatch.setenv("YT_CLIENT_ID", "x")
+    monkeypatch.delenv("YT_CLIENT_SECRET", raising=False)
+    monkeypatch.setenv("YT_REFRESH_TOKEN", "")
+    with pytest.raises(RuntimeError, match="YT_CLIENT_SECRET, YT_REFRESH_TOKEN"):
+        P.yt_client()
